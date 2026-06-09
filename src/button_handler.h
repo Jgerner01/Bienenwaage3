@@ -11,14 +11,20 @@ public:
     void begin();
     void loop();
 
-    // Zugriff auf aktuell gewähltes Modul (für LCD und Web)
     uint8_t getSelectedModule() const { return _selectedModule; }
+    bool    popTareYieldConfirmed();
 
-    // Ausstehende Aktionen (werden nach Abfrage automatisch zurückgesetzt)
-    bool popTareYieldConfirmed();   // true = Ertragstara bestätigt
+    // Web-Simulation: löst Kurzdruckverhalten aus
+    void simulateBtn1();
+    void simulateBtn2();
 
 private:
+    enum class Phase    { STARTUP_ETH, STARTUP_AP, NORMAL };
     enum class BtnState { IDLE, PRESSED, LONG_TRIGGERED, CONFIRM_WAIT };
+
+    Phase         _phase        = Phase::STARTUP_ETH;
+    unsigned long _phaseMs      = 0;
+    unsigned long _lastUpdateMs = 0;
 
     uint8_t  _selectedModule   = 0;
     BtnState _btn1State        = BtnState::IDLE;
@@ -31,6 +37,10 @@ private:
     bool _pendingYieldConfirm = false;
     bool _yieldConfirmed      = false;
 
+    void _handleStartup();
     void _handleBtn1();
     void _handleBtn2();
+    void _advanceModule();
+    void _showModule();
+    void _enterNormal();
 };

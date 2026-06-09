@@ -7,7 +7,7 @@
 #include <stdint.h>
 
 // ── Versionierung ──────────────────────────────────────────────────────────────
-#define FW_VERSION        "1.1.0"
+#define FW_VERSION        "1.2.0"
 #define PARAM_FORMAT_VER  1          // JSON-Exportformat-Version
 
 // ── HX711 – Pins ──────────────────────────────────────────────────────────────
@@ -48,11 +48,13 @@ constexpr uint8_t HX711_DOUT_PINS[HX711_MAX_MODULES] = {
 #define LCD_ROWS          2
 
 // ── Taster ────────────────────────────────────────────────────────────────────
-#define BTN_SELECT_PIN    36   // Taster 1: Modul wählen (Input only, ext. PU)
-#define BTN_FUNC_PIN      39   // Taster 2: Funktion     (Input only, ext. PU)
-#define BTN_DEBOUNCE_MS   50
-#define BTN_LONG_PRESS_MS 5000   // Langdruck für Ertragstara
-#define BTN_CONFIRM_MS    5000   // Bestätigungsfenster nach Langdruck
+#define BTN_SELECT_PIN      36   // Taster 1: Modul wählen (Input only, ext. PU)
+#define BTN_FUNC_PIN        39   // Taster 2: Funktion     (Input only, ext. PU)
+#define BTN_DEBOUNCE_MS     50
+#define BTN_LONG_PRESS_MS   5000   // Langdruck für Ertragstara
+#define BTN_CONFIRM_MS      5000   // Bestätigungsfenster nach Langdruck
+#define BTN_STARTUP_ETH_MS  5000UL // Startup-Anzeige LAN-IP
+#define BTN_STARTUP_AP_MS   5000UL // Startup-Anzeige WiFi-AP-IP
 
 // ── Netzwerk – Ethernet (LAN8720) ─────────────────────────────────────────────
 #define ETH_PHY_ADDR      1

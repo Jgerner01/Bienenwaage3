@@ -77,9 +77,6 @@ void EthWifiManager::begin() {
                       _cfg.apSsid.c_str(), _cfg.apPassword.c_str(), apIp.c_str());
     }
 
-    lcdPrint(0, _cfg.apSsid.substring(0, 16));
-    lcdPrint(1, apIp);
-
     Serial.println("[NET] === Netzwerk-Init Ende ===");
     _enterState(State::ETH_CONNECTING);
 }
@@ -104,8 +101,6 @@ void EthWifiManager::loop() {
                 _lastReconnectMs = now;
                 _reconnectCount++;
                 Serial.printf("[ETH] Warte auf ETH-Link (%d)...\n", _reconnectCount);
-                lcdPrint(0, _cfg.apSsid.substring(0, 16));
-                lcdPrint(1, WiFi.softAPIP().toString());
             }
             break;
     }
@@ -152,20 +147,15 @@ void EthWifiManager::_onEthEvent(arduino_event_id_t event, arduino_event_info_t 
 void EthWifiManager::_handleEthConnected() {
     _enterState(State::ETH_CONNECTED);
     _reconnectCount = 0;
-    String ethIp = ETH.localIP().toString();
-    String apIp  = WiFi.softAPIP().toString();
-    lcdPrint(0, "ETH: " + ethIp);
-    lcdPrint(1, "AP:  " + apIp);
     Serial.printf("[ETH] Verbunden – ETH-IP: %s  AP-IP: %s\n",
-                  ethIp.c_str(), apIp.c_str());
+                  ETH.localIP().toString().c_str(),
+                  WiFi.softAPIP().toString().c_str());
 }
 
 void EthWifiManager::_handleEthDisconnected() {
     if (_state == State::ETH_CONNECTED) {
         _enterState(State::ETH_RECONNECTING);
         _lastReconnectMs = millis();
-        lcdPrint(0, "ETH getrennt");
-        lcdPrint(1, WiFi.softAPIP().toString());
         Serial.println("[ETH] Verbindung verloren");
     }
 }

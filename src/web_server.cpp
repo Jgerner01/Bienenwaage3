@@ -10,18 +10,20 @@
 #include "eth_wifi_manager.h"
 #include "mqtt_client.h"
 #include "storage.h"
+#include "button_handler.h"
 #include <ArduinoJson.h>
 #include <LittleFS.h>
 #include <Update.h>
 #include <ArduinoOTA.h>
 #include <WiFi.h>
 
-extern Hx711Multi       hx711;
+extern Hx711Multi        hx711;
 extern TemperatureSensor tempSensor;
 extern LcdDisplay        lcd;
 extern EthWifiManager    network;
 extern MqttManager       mqttClient;
 extern StorageManager    storage;
+extern ButtonHandler     buttons;
 
 // ── Wiederherstellungsseite (PROGMEM) – wird angezeigt wenn LittleFS leer ist ──
 static const char RECOVERY_PAGE[] PROGMEM = R"html(
@@ -104,14 +106,19 @@ void WebServerManager::begin() {
 
 void WebServerManager::_setupRoutes() {
     // Webseiten aus PROGMEM – kein LittleFS-Image nötig
-    _server.on("/",          HTTP_GET, [](AsyncWebServerRequest* req) {
-        req->send(200, "text/html",       WEB_INDEX_HTML); });
-    _server.on("/index.html",HTTP_GET, [](AsyncWebServerRequest* req) {
-        req->send(200, "text/html",       WEB_INDEX_HTML); });
-    _server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest* req) {
-        req->send(200, "text/css",        WEB_STYLE_CSS); });
-    _server.on("/app.js",    HTTP_GET, [](AsyncWebServerRequest* req) {
-        req->send(200, "application/javascript", WEB_APP_JS); });
+    auto sendNoCache = [](AsyncWebServerRequest* req, const char* mime, const char* content) {
+        AsyncWebServerResponse* resp = req->beginResponse(200, mime, content);
+        resp->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        req->send(resp);
+    };
+    _server.on("/",          HTTP_GET, [sendNoCache](AsyncWebServerRequest* req) {
+        sendNoCache(req, "text/html",             WEB_INDEX_HTML); });
+    _server.on("/index.html",HTTP_GET, [sendNoCache](AsyncWebServerRequest* req) {
+        sendNoCache(req, "text/html",             WEB_INDEX_HTML); });
+    _server.on("/style.css", HTTP_GET, [sendNoCache](AsyncWebServerRequest* req) {
+        sendNoCache(req, "text/css",              WEB_STYLE_CSS); });
+    _server.on("/app.js",    HTTP_GET, [sendNoCache](AsyncWebServerRequest* req) {
+        sendNoCache(req, "application/javascript", WEB_APP_JS); });
 
     // JSON-Daten für AJAX
     _server.on("/data",   HTTP_GET, [this](AsyncWebServerRequest* r) { _handleData(r); });
@@ -170,6 +177,16 @@ void WebServerManager::_setupRoutes() {
         [this](AsyncWebServerRequest* r, const String& fn, size_t idx, uint8_t* d, size_t l, bool fin) {
             _handleFsUpload(r, fn, idx, d, l, fin);
         });
+
+    // Web-Simulation der physischen Taster
+    _server.on("/btn1", HTTP_POST, [](AsyncWebServerRequest* r) {
+        buttons.simulateBtn1();
+        r->send(200, "application/json", "{\"ok\":true}");
+    });
+    _server.on("/btn2", HTTP_POST, [](AsyncWebServerRequest* r) {
+        buttons.simulateBtn2();
+        r->send(200, "application/json", "{\"ok\":true}");
+    });
 }
 
 // ── /data ──────────────────────────────────────────────────────────────────────
@@ -197,7 +214,7 @@ void WebServerManager::_handleData(AsyncWebServerRequest* req) {
     doc["lcd"]["line1"] = lcd.getLine(0);
     doc["lcd"]["line2"] = lcd.getLine(1);
 
-    doc["network"]["eth_ip"]         = network.getLocalIp();
+    doc["network"]["eth_ip"]         = ETH.localIP().toString();
     doc["network"]["eth_gateway"]    = ETH.gatewayIP().toString();
     doc["network"]["eth_subnet"]     = ETH.subnetMask().toString();
     doc["network"]["eth_mac"]        = ETH.macAddress();

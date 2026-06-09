@@ -125,6 +125,12 @@ function sendSet(payload) {
     });
 }
 
+// ── Taster-Simulation ─────────────────────────────────────────────────────────
+
+function pressBtn(n) {
+    fetch('/btn' + n, { method: 'POST' });
+}
+
 // ── Werkseinstellungen ─────────────────────────────────────────────────────────
 
 function factoryReset() {
@@ -166,16 +172,30 @@ document.addEventListener('DOMContentLoaded', () => {
     // OTA-Upload
     const otaForm = document.getElementById('ota-form');
     if (otaForm) {
-        otaForm.addEventListener('submit', async (e) => {
+        otaForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const file = document.getElementById('ota-file').files[0];
             if (!file) return;
             const prog = document.getElementById('ota-progress');
+            const bar  = document.getElementById('ota-bar');
             if (prog) prog.style.display = 'block';
-            const data = await file.arrayBuffer();
-            const resp = await fetch('/update', { method: 'POST', body: data });
-            const json = await resp.json();
-            alert(json.ok ? 'OTA OK – Neustart...' : 'OTA fehlgeschlagen');
+            const fd = new FormData();
+            fd.append('file', file);
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/update');
+            xhr.upload.onprogress = (ev) => {
+                if (bar && ev.lengthComputable)
+                    bar.value = Math.round(100 * ev.loaded / ev.total);
+            };
+            xhr.onload = () => {
+                try {
+                    const json = JSON.parse(xhr.responseText);
+                    alert(json.ok ? 'OTA OK – Neustart...' : 'OTA fehlgeschlagen');
+                } catch (_) {
+                    alert(xhr.status === 200 ? 'OTA OK – Neustart...' : 'OTA fehlgeschlagen');
+                }
+            };
+            xhr.send(fd);
         });
     }
 

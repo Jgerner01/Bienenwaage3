@@ -1,4 +1,4 @@
-﻿// Bienenwaage3 – Web-Inhalte als PROGMEM (aus data/ generiert)
+// Bienenwaage3 – Web-Inhalte als PROGMEM (aus data/ generiert)
 // Automatisch eingebettet – kein separates LittleFS-Image nötig
 #pragma once
 #include <pgmspace.h>
@@ -16,6 +16,48 @@ static const char WEB_INDEX_HTML[] PROGMEM = R"HTMLEOF(
 
 <header class="site-header">
   <span class="header-title">Bienenwaage3</span>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 42" width="80" height="42" aria-label="Biene auf Waage">
+    <!-- Fuß & Stiel -->
+    <rect x="36" y="33" width="8" height="2.5" rx="1" fill="#b8730a"/>
+    <rect x="39" y="17" width="2" height="16" fill="#b8730a"/>
+    <!-- Balken -->
+    <rect x="8" y="14" width="64" height="3" rx="1.5" fill="#e89010"/>
+    <circle cx="40" cy="15.5" r="2.2" fill="#b8730a"/>
+    <!-- Linke Ketten & Schale -->
+    <line x1="13" y1="17" x2="9"  y2="27" stroke="#b8730a" stroke-width="0.8"/>
+    <line x1="13" y1="17" x2="17" y2="27" stroke="#b8730a" stroke-width="0.8"/>
+    <path d="M6,27 Q13,34 20,27" stroke="#e89010" stroke-width="1.5" fill="rgba(232,144,16,0.1)" stroke-linecap="round"/>
+    <!-- Rechte Ketten & Schale -->
+    <line x1="67" y1="17" x2="63" y2="27" stroke="#b8730a" stroke-width="0.8"/>
+    <line x1="67" y1="17" x2="71" y2="27" stroke="#b8730a" stroke-width="0.8"/>
+    <path d="M60,27 Q67,34 74,27" stroke="#e89010" stroke-width="1.5" fill="rgba(232,144,16,0.1)" stroke-linecap="round"/>
+    <!-- Flügel (hinter Körper) -->
+    <ellipse cx="10" cy="18" rx="5" ry="2.5" fill="rgba(210,238,255,0.82)" stroke="#aacce0" stroke-width="0.45" transform="rotate(-28 10 18)"/>
+    <ellipse cx="16" cy="18.5" rx="4.5" ry="2" fill="rgba(210,238,255,0.82)" stroke="#aacce0" stroke-width="0.45" transform="rotate(-8 16 18.5)"/>
+    <!-- Bienenleib -->
+    <ellipse cx="13" cy="23" rx="5.2" ry="2.8" fill="#FFD700"/>
+    <rect x="10.8" y="20.4" width="1.2" height="5.2" rx="0.6" fill="#111" opacity="0.42"/>
+    <rect x="12.9" y="20.1" width="1.3" height="5.8" rx="0.6" fill="#111" opacity="0.42"/>
+    <rect x="15"   y="20.4" width="1.2" height="5.2" rx="0.6" fill="#111" opacity="0.42"/>
+    <!-- Kopf -->
+    <circle cx="18.2" cy="21.4" r="2.3" fill="#FFD700"/>
+    <circle cx="19"   cy="20.5" r="0.65" fill="#111"/>
+    <!-- Fühler -->
+    <line x1="17.5" y1="19.2" x2="16.5" y2="17" stroke="#111" stroke-width="0.7" stroke-linecap="round"/>
+    <circle cx="16.5" cy="17" r="0.7" fill="#111"/>
+    <line x1="18.5" y1="19.1" x2="19.5" y2="17" stroke="#111" stroke-width="0.7" stroke-linecap="round"/>
+    <circle cx="19.5" cy="17" r="0.7" fill="#111"/>
+    <!-- Honigwabe: 3 Sechsecke (pointy-top, r=3) -->
+    <polygon points="64.4,19.5 67,21 67,24 64.4,25.5 61.8,24 61.8,21" fill="#FFD700" stroke="#b8730a" stroke-width="0.7"/>
+    <polygon points="69.6,19.5 72.2,21 72.2,24 69.6,25.5 67,24 67,21"  fill="#FFC433" stroke="#b8730a" stroke-width="0.7"/>
+    <polygon points="67,24 69.6,25.5 69.6,28.5 67,30 64.4,28.5 64.4,25.5" fill="#FFB800" stroke="#b8730a" stroke-width="0.7"/>
+    <!-- Honigtropfen -->
+    <path d="M65.5,30 Q67,36 68.5,30 Z" fill="#FFB800" opacity="0.72"/>
+    <!-- Glanzpunkte -->
+    <circle cx="64.4" cy="22.5" r="0.9" fill="#fff" opacity="0.28"/>
+    <circle cx="69.6" cy="22.5" r="0.9" fill="#fff" opacity="0.28"/>
+    <circle cx="67"   cy="27"   r="0.9" fill="#fff" opacity="0.28"/>
+  </svg>
   <span id="fw-info" class="fw-badge">Firmware v-- / Build --</span>
 </header>
 
@@ -170,6 +212,13 @@ function saveNetworkFromMqttForm() {
       <span class="lcd-line" id="lcd-line2">                </span>
     </div>
   </div>
+  <div class="card">
+    <h3>Taster</h3>
+    <div class="form-row">
+      <button class="btn" onclick="pressBtn(1)">Taster 1 – Modul wählen</button>
+      <button class="btn secondary" onclick="pressBtn(2)">Taster 2 – Funktion</button>
+    </div>
+  </div>
 </div>
 
 <!-- ── Parameter ──────────────────────────────────────────────────────── -->
@@ -203,7 +252,6 @@ function saveNetworkFromMqttForm() {
 <script src="app.js"></script>
 </body>
 </html>
-
 )HTMLEOF";
 
 static const char WEB_STYLE_CSS[] PROGMEM = R"CSSEOF(
@@ -213,8 +261,8 @@ body { font-family: monospace; background: #f0f2f5; color: #333; font-size: 14px
 
 /* ── Header ──────────────────────────────────────────────────────────────── */
 .site-header {
-  display: flex; justify-content: space-between; align-items: center;
-  background: #fff; padding: 8px 16px;
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+  background: #fff; padding: 6px 16px;
   border-bottom: 2px solid #e89010;
   box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
@@ -222,6 +270,7 @@ body { font-family: monospace; background: #f0f2f5; color: #333; font-size: 14px
 .fw-badge {
   font-size: 11px; color: #666; background: #fdf6e8;
   border: 1px solid #e0c888; padding: 3px 10px; border-radius: 3px;
+  justify-self: end;
 }
 
 /* ── Tabs ────────────────────────────────────────────────────────────────── */
@@ -259,20 +308,19 @@ body { font-family: monospace; background: #f0f2f5; color: #333; font-size: 14px
   background: #1c3a1c;
   border: 4px solid #0d1f0d;
   border-radius: 3px;
-  padding: 10px 16px;
+  padding: 12px 18px;
   font-family: 'Courier New', Courier, monospace;
   box-shadow: 0 3px 10px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(255,255,255,0.04);
 }
 .lcd-line {
   display: block;
   color: #33ff22;
-  font-size: 18px;
+  font-size: 21px;
   font-weight: bold;
-  letter-spacing: 3px;
+  letter-spacing: 3.5px;
   line-height: 1.85;
   white-space: pre;
   width: 16ch;
-  /* Kein Text-Shadow = scharfe, klare Zeichen */
   text-shadow: none;
   -webkit-font-smoothing: antialiased;
 }
@@ -322,7 +370,6 @@ progress { width: 100%; height: 12px; }
 
 /* ── Temperaturanzeige ───────────────────────────────────────────────────── */
 .temp-value { font-size: 22px; color: #2277cc; font-weight: bold; }
-
 )CSSEOF";
 
 static const char WEB_APP_JS[] PROGMEM = R"JSEOF(
@@ -453,6 +500,12 @@ function sendSet(payload) {
     });
 }
 
+// ── Taster-Simulation ─────────────────────────────────────────────────────────
+
+function pressBtn(n) {
+    fetch('/btn' + n, { method: 'POST' });
+}
+
 // ── Werkseinstellungen ─────────────────────────────────────────────────────────
 
 function factoryReset() {
@@ -494,16 +547,30 @@ document.addEventListener('DOMContentLoaded', () => {
     // OTA-Upload
     const otaForm = document.getElementById('ota-form');
     if (otaForm) {
-        otaForm.addEventListener('submit', async (e) => {
+        otaForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const file = document.getElementById('ota-file').files[0];
             if (!file) return;
             const prog = document.getElementById('ota-progress');
+            const bar  = document.getElementById('ota-bar');
             if (prog) prog.style.display = 'block';
-            const data = await file.arrayBuffer();
-            const resp = await fetch('/update', { method: 'POST', body: data });
-            const json = await resp.json();
-            alert(json.ok ? 'OTA OK – Neustart...' : 'OTA fehlgeschlagen');
+            const fd = new FormData();
+            fd.append('file', file);
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/update');
+            xhr.upload.onprogress = (ev) => {
+                if (bar && ev.lengthComputable)
+                    bar.value = Math.round(100 * ev.loaded / ev.total);
+            };
+            xhr.onload = () => {
+                try {
+                    const json = JSON.parse(xhr.responseText);
+                    alert(json.ok ? 'OTA OK – Neustart...' : 'OTA fehlgeschlagen');
+                } catch (_) {
+                    alert(xhr.status === 200 ? 'OTA OK – Neustart...' : 'OTA fehlgeschlagen');
+                }
+            };
+            xhr.send(fd);
         });
     }
 
@@ -567,5 +634,5 @@ document.addEventListener('DOMContentLoaded', () => {
     updateData();
     setInterval(updateData, UPDATE_INTERVAL_MS);
 });
-
 )JSEOF";
+
