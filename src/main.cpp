@@ -4,6 +4,7 @@
 // Alle Initialisierungen in setup(), nur Koordination in loop()
 
 #include <Arduino.h>
+#include <ArduinoOTA.h>
 #include "config.h"
 #include "hx711_multi.h"
 #include "temperature.h"
@@ -27,7 +28,8 @@ ButtonHandler     buttons;
 // ── setup ──────────────────────────────────────────────────────────────────────
 void setup() {
     Serial.begin(115200);
-    Serial.printf("\n=== Bienenwaage3 v%s ===\n", FW_VERSION);
+    esp_reset_reason_t reason = esp_reset_reason();
+    Serial.printf("\n=== Bienenwaage3 v%s ===  (Reset: %d)\n", FW_VERSION, (int)reason);
 
     Wire.begin(LCD_SDA_PIN, LCD_SCL_PIN);
     storage.begin();
@@ -53,10 +55,11 @@ void setup() {
 
 // ── loop ───────────────────────────────────────────────────────────────────────
 void loop() {
+    ArduinoOTA.handle();
     network.loop();
     hx711.loop();
     tempSensor.loop();
     buttons.loop();
     mqttClient.loop();
-    // WebServer ist event-driven (AsyncWebServer) – kein expliziter loop-Aufruf
+    // AsyncWebServer ist event-driven – kein expliziter loop-Aufruf nötig
 }

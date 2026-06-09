@@ -1,4 +1,5 @@
-// Bienenwaage3 – Ethernet + WiFi-AP Zustandsautomat
+// Bienenwaage3 – Ethernet + WiFi-AP
+// ETH.begin() einmalig, WiFi AP danach – mit vollständigem Debug-Output
 // Autor: Johann Gerner
 
 #include "eth_wifi_manager.h"
@@ -14,10 +15,73 @@ void EthWifiManager::begin() {
     _instance = this;
     storage.loadNetworkConfig(_cfg);
 
+    Serial.println("[NET] === Netzwerk-Init Start ===");
+    Serial.printf("[NET] AP SSID:     '%s'\n", _cfg.apSsid.c_str());
+    Serial.printf("[NET] AP Passwort: '%s'\n", _cfg.apPassword.c_str());
+    Serial.printf("[NET] useDhcp:     %d\n",   _cfg.useDhcp);
+    Serial.printf("[NET] staticIp:    '%s'\n", _cfg.staticIp.c_str());
+
     WiFi.onEvent(_onEthEvent);
 
+    // ── Schritt 1: WiFi-Modus vor ETH.begin() ─────────────────────────────────
+    Serial.printf("[NET] WiFi Mode vor ETH.begin(): %d\n", (int)WiFi.getMode());
+
+    // ── Schritt 2: ETH einmalig initialisieren ─────────────────────────────────
+    Serial.println("[NET] Rufe ETH.begin() auf...");
+    bool ethBeginOk = ETH.begin(
+        ETH_PHY_ADDR, ETH_PHY_POWER, ETH_PHY_MDC, ETH_PHY_MDIO,
+        ETH_PHY_LAN8720, ETH_CLOCK_GPIO0_IN
+    );
+    Serial.printf("[NET] ETH.begin() = %d\n", (int)ethBeginOk);
+    Serial.printf("[NET] WiFi Mode nach ETH.begin(): %d  (0=OFF 1=STA 2=AP 3=APSTA)\n",
+                  (int)WiFi.getMode());
+
+    if (!_cfg.useDhcp && _cfg.staticIp.length() > 0) {
+        IPAddress ip, gw, sn;
+        ip.fromString(_cfg.staticIp);
+        gw.fromString(_cfg.gateway);
+        sn.fromString(_cfg.subnet);
+        ETH.config(ip, gw, sn);
+        Serial.printf("[NET] Statische IP konfiguriert: %s\n", _cfg.staticIp.c_str());
+    }
+
+    // 100 ms warten bis ETH-Init intern abgeschlossen
+    delay(100);
+    Serial.printf("[NET] WiFi Mode nach delay: %d\n", (int)WiFi.getMode());
+
+    // ── Schritt 3: WiFi Modus auf AP setzen ───────────────────────────────────
+    Serial.println("[NET] Setze WiFi.mode(WIFI_AP)...");
+    bool modeOk = WiFi.mode(WIFI_AP);
+    Serial.printf("[NET] WiFi.mode(WIFI_AP) = %d, Mode danach: %d\n",
+                  (int)modeOk, (int)WiFi.getMode());
+    delay(100);
+
+    // ── Schritt 4: SoftAP starten ─────────────────────────────────────────────
+    Serial.printf("[NET] Rufe WiFi.softAP('%s', '%s') auf...\n",
+                  _cfg.apSsid.c_str(), _cfg.apPassword.c_str());
+    bool apOk = WiFi.softAP(_cfg.apSsid.c_str(), _cfg.apPassword.c_str());
+    Serial.printf("[NET] WiFi.softAP() = %d\n", (int)apOk);
+    delay(500); // warten bis AP vollständig hochgefahren
+
+    // ── Schritt 5: Ergebnis prüfen ────────────────────────────────────────────
+    String apIp   = WiFi.softAPIP().toString();
+    uint8_t mode  = (uint8_t)WiFi.getMode();
+    Serial.printf("[NET] AP IP:    %s\n", apIp.c_str());
+    Serial.printf("[NET] WiFi Mode final: %d\n", (int)mode);
+    Serial.printf("[NET] Verbundene Clients: %d\n", WiFi.softAPgetStationNum());
+
+    if (apIp == "0.0.0.0") {
+        Serial.println("[NET] FEHLER: AP-IP ist 0.0.0.0 – softAP nicht gestartet!");
+    } else {
+        Serial.printf("[NET] WiFi AP bereit: SSID=%s  PW=%s  IP=%s\n",
+                      _cfg.apSsid.c_str(), _cfg.apPassword.c_str(), apIp.c_str());
+    }
+
+    lcdPrint(0, _cfg.apSsid.substring(0, 16));
+    lcdPrint(1, apIp);
+
+    Serial.println("[NET] === Netzwerk-Init Ende ===");
     _enterState(State::ETH_CONNECTING);
-    _startEthConnect();
 }
 
 void EthWifiManager::loop() {
@@ -26,39 +90,22 @@ void EthWifiManager::loop() {
     switch (_state) {
         case State::ETH_CONNECTING:
             if (now - _stateEnteredMs > ETH_CONNECT_TIMEOUT_MS) {
-                // Timeout → Wiederverbinden
-#ifdef DEBUG_SERIAL
-                Serial.println("[ETH] Verbindungs-Timeout");
-#endif
+                Serial.println("[ETH] Timeout – kein Link, warte auf Kabel...");
                 _enterState(State::ETH_RECONNECTING);
+                _lastReconnectMs = now;
             }
             break;
 
         case State::ETH_CONNECTED:
-            // Verbindungsverlust wird per Event behandelt
             break;
 
         case State::ETH_RECONNECTING:
-            if (now - _stateEnteredMs > ETH_MAX_RECONNECT_MS) {
-                // Zu lange kein Erfolg → AP-Modus
-                _enterState(State::AP_CONFIG_MODE);
-                _startApMode();
-            } else if (now - _lastReconnectMs > ETH_RECONNECT_INTERVAL_MS) {
+            if (now - _lastReconnectMs > ETH_RECONNECT_INTERVAL_MS) {
                 _lastReconnectMs = now;
                 _reconnectCount++;
-#ifdef DEBUG_SERIAL
-                Serial.printf("[ETH] Reconnect-Versuch %d\n", _reconnectCount);
-#endif
-                _startEthConnect();
-            }
-            break;
-
-        case State::AP_CONFIG_MODE:
-            if (now - _stateEnteredMs > AP_CONFIG_TIMEOUT_MS) {
-#ifdef DEBUG_SERIAL
-                Serial.println("[ETH] AP-Timeout – Neustart");
-#endif
-                ESP.restart();
+                Serial.printf("[ETH] Warte auf ETH-Link (%d)...\n", _reconnectCount);
+                lcdPrint(0, _cfg.apSsid.substring(0, 16));
+                lcdPrint(1, WiFi.softAPIP().toString());
             }
             break;
     }
@@ -66,14 +113,12 @@ void EthWifiManager::loop() {
 
 String EthWifiManager::getLocalIp() const {
     if (_state == State::ETH_CONNECTED) return ETH.localIP().toString();
-    if (_state == State::AP_CONFIG_MODE) return WiFi.softAPIP().toString();
-    return "0.0.0.0";
+    return WiFi.softAPIP().toString();
 }
 
 void EthWifiManager::applyNetworkConfig(const NetworkConfig& cfg) {
     _cfg = cfg;
     storage.saveNetworkConfig(cfg);
-    // Neustart damit neue IP-Einstellungen wirksam werden
     delay(500);
     ESP.restart();
 }
@@ -83,46 +128,8 @@ void EthWifiManager::applyNetworkConfig(const NetworkConfig& cfg) {
 void EthWifiManager::_enterState(State s) {
     _state          = s;
     _stateEnteredMs = millis();
-#ifdef DEBUG_SERIAL
-    const char* names[] = {"ETH_CONNECTING","ETH_CONNECTED","ETH_RECONNECTING","AP_CONFIG_MODE"};
-    Serial.printf("[ETH] → %s\n", names[(int)s]);
-#endif
-}
-
-void EthWifiManager::_startEthConnect() {
-    _enterState(State::ETH_CONNECTING);
-
-    // WT32-ETH01: LAN8720 an RMII, Takt von GPIO0 (externer 50-MHz-Oszillator)
-    ETH.begin(
-        ETH_PHY_ADDR,
-        ETH_PHY_POWER,
-        ETH_PHY_MDC,
-        ETH_PHY_MDIO,
-        ETH_PHY_LAN8720,
-        ETH_CLOCK_GPIO0_IN
-    );
-
-    if (!_cfg.useDhcp && _cfg.staticIp.length() > 0) {
-        IPAddress ip, gw, sn;
-        ip.fromString(_cfg.staticIp);
-        gw.fromString(_cfg.gateway);
-        sn.fromString(_cfg.subnet);
-        ETH.config(ip, gw, sn);
-    }
-
-    lcdPrint(1, "ETH verbindet...");
-}
-
-void EthWifiManager::_startApMode() {
-    WiFi.softAP(WIFI_AP_SSID, WIFI_AP_PASSWORD);
-    String ip = WiFi.softAPIP().toString();
-
-    lcdPrint(0, "AP: " + String(WIFI_AP_SSID));
-    lcdPrint(1, ip);
-
-#ifdef DEBUG_SERIAL
-    Serial.printf("[ETH] AP-Modus aktiv – SSID: %s  IP: %s\n", WIFI_AP_SSID, ip.c_str());
-#endif
+    const char* names[] = {"ETH_CONNECTING", "ETH_CONNECTED", "ETH_RECONNECTING"};
+    Serial.printf("[ETH] Zustand: %s\n", names[(int)s]);
 }
 
 // ── Statischer Event-Handler ───────────────────────────────────────────────────
@@ -145,17 +152,20 @@ void EthWifiManager::_onEthEvent(arduino_event_id_t event, arduino_event_info_t 
 void EthWifiManager::_handleEthConnected() {
     _enterState(State::ETH_CONNECTED);
     _reconnectCount = 0;
-    String ip = ETH.localIP().toString();
-    lcdPrint(1, ip);
-#ifdef DEBUG_SERIAL
-    Serial.printf("[ETH] Verbunden – IP: %s\n", ip.c_str());
-#endif
+    String ethIp = ETH.localIP().toString();
+    String apIp  = WiFi.softAPIP().toString();
+    lcdPrint(0, "ETH: " + ethIp);
+    lcdPrint(1, "AP:  " + apIp);
+    Serial.printf("[ETH] Verbunden – ETH-IP: %s  AP-IP: %s\n",
+                  ethIp.c_str(), apIp.c_str());
 }
 
 void EthWifiManager::_handleEthDisconnected() {
     if (_state == State::ETH_CONNECTED) {
-        lcdPrint(1, "ETH getrennt");
         _enterState(State::ETH_RECONNECTING);
         _lastReconnectMs = millis();
+        lcdPrint(0, "ETH getrennt");
+        lcdPrint(1, WiFi.softAPIP().toString());
+        Serial.println("[ETH] Verbindung verloren");
     }
 }

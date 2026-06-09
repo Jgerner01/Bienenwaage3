@@ -14,6 +14,8 @@ struct NetworkConfig {
     String staticIp     = "";
     String gateway      = "";
     String subnet       = "";
+    String apSsid       = WIFI_AP_SSID;
+    String apPassword   = WIFI_AP_PASSWORD;
     String mqttServer   = "";
     int    mqttPort     = MQTT_DEFAULT_PORT;
     String mqttUser     = "";

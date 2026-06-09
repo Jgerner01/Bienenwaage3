@@ -18,6 +18,7 @@ private:
 
     // REST-Handler
     void _handleData(AsyncWebServerRequest* req);
+    void _handleConfig(AsyncWebServerRequest* req);
     void _handleSet(AsyncWebServerRequest* req, uint8_t* data, size_t len);
     void _handleTare(AsyncWebServerRequest* req, uint8_t* data, size_t len);
     void _handleCalibrate(AsyncWebServerRequest* req, uint8_t* data, size_t len);
@@ -26,8 +27,13 @@ private:
     void _handleReset(AsyncWebServerRequest* req, uint8_t* data, size_t len);
     void _handleStatus(AsyncWebServerRequest* req);
 
-    // OTA-Upload (HTTP)
+    // OTA-Upload Firmware (HTTP)
     void _handleOtaResponse(AsyncWebServerRequest* req);
     void _handleOtaUpload(AsyncWebServerRequest* req, const String& filename,
                           size_t index, uint8_t* data, size_t len, bool final);
+
+    // OTA-Upload LittleFS-Image (HTTP)
+    void _handleFsResponse(AsyncWebServerRequest* req);
+    void _handleFsUpload(AsyncWebServerRequest* req, const String& filename,
+                         size_t index, uint8_t* data, size_t len, bool final);
 };

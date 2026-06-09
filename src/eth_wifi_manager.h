@@ -1,5 +1,5 @@
-// Bienenwaage3 – Ethernet (primär) + WiFi-AP (Fallback/Konfiguration)
-// Zustandsautomat: ETH_CONNECTING → ETH_CONNECTED / ETH_RECONNECTING → AP_CONFIG_MODE
+// Bienenwaage3 – Ethernet (primär) + WiFi-AP (immer aktiv als Fallback)
+// WiFi-AP startet sofort beim Boot (192.168.4.1), ETH wird parallel versucht
 // Autor: Johann Gerner
 
 #pragma once
@@ -13,8 +13,7 @@ public:
     enum class State {
         ETH_CONNECTING,
         ETH_CONNECTED,
-        ETH_RECONNECTING,
-        AP_CONFIG_MODE
+        ETH_RECONNECTING
     };
 
     void  begin();
@@ -34,8 +33,6 @@ private:
     int           _reconnectCount  = 0;
 
     void _enterState(State s);
-    void _startEthConnect();
-    void _startApMode();
 
     // ETH-Ereignisse werden statisch weitergeleitet
     static void _onEthEvent(arduino_event_id_t event, arduino_event_info_t info);

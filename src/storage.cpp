@@ -66,6 +66,8 @@ void StorageManager::loadNetworkConfig(NetworkConfig& cfg) {
     cfg.staticIp     = prefs.getString("ip",       "");
     cfg.gateway      = prefs.getString("gw",       "");
     cfg.subnet       = prefs.getString("sn",       "255.255.255.0");
+    cfg.apSsid       = prefs.getString("apSsid",   WIFI_AP_SSID);
+    cfg.apPassword   = prefs.getString("apPass",   WIFI_AP_PASSWORD);
     cfg.mqttServer   = prefs.getString("mqttSrv",  "");
     cfg.mqttPort     = prefs.getInt("mqttPort",    MQTT_DEFAULT_PORT);
     cfg.mqttUser     = prefs.getString("mqttUser", "");
@@ -84,6 +86,8 @@ void StorageManager::saveNetworkConfig(const NetworkConfig& cfg) {
     prefs.putString("ip",      cfg.staticIp);
     prefs.putString("gw",      cfg.gateway);
     prefs.putString("sn",      cfg.subnet);
+    prefs.putString("apSsid",  cfg.apSsid);
+    prefs.putString("apPass",  cfg.apPassword);
     prefs.putString("mqttSrv", cfg.mqttServer);
     prefs.putInt("mqttPort",   cfg.mqttPort);
     prefs.putString("mqttUser",cfg.mqttUser);

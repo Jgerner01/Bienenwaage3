@@ -22,7 +22,7 @@ void MqttManager::begin() {
 
     _client.setServer(_cfg.mqttServer.c_str(), _cfg.mqttPort);
     _client.setKeepAlive(MQTT_KEEPALIVE_S);
-    _connect();
+    // Verbindungsaufbau erfolgt in loop() sobald ETH verbunden ist
 }
 
 void MqttManager::loop() {

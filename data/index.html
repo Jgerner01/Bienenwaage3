@@ -8,6 +8,11 @@
 </head>
 <body>
 
+<header class="site-header">
+  <span class="header-title">Bienenwaage3</span>
+  <span id="fw-info" class="fw-badge">Firmware v-- / Build --</span>
+</header>
+
 <div class="tabs">
   <button class="tab-btn active" data-tab="status">Status</button>
   <button class="tab-btn" data-tab="waagen">Waagen</button>
@@ -18,7 +23,7 @@
   <button class="tab-btn" data-tab="firmware">Firmware</button>
 </div>
 
-<!-- ── Status ─────────────────────────────────────────────────────────────── -->
+<!-- ── Status ──────────────────────────────────────────────────────────── -->
 <div id="tab-status" class="tab-content active">
   <div class="card">
     <h3>Module</h3>
@@ -40,10 +45,9 @@
   </div>
 </div>
 
-<!-- ── Waagen ─────────────────────────────────────────────────────────────── -->
+<!-- ── Waagen ──────────────────────────────────────────────────────────── -->
 <div id="tab-waagen" class="tab-content">
   <div id="waagen-config">
-    <!-- Per Modul: wird per JS befüllt oder statisch für alle 7 Module -->
     <script>
     for (let i = 0; i < 7; i++) {
       document.write(`
@@ -83,10 +87,23 @@
   </div>
 </div>
 
-<!-- ── WLAN/ETH ────────────────────────────────────────────────────────────── -->
+<!-- ── WLAN/ETH ─────────────────────────────────────────────────────────── -->
 <div id="tab-netz" class="tab-content">
+
   <div class="card">
-    <h3>Ethernet / IP</h3>
+    <h3>Aktueller Netzwerk-Status</h3>
+    <div class="eth-status-grid">
+      <span class="lbl">ETH IP-Adresse</span><span id="cur-eth-ip" class="val">--</span>
+      <span class="lbl">Gateway</span>        <span id="cur-eth-gw"  class="val">--</span>
+      <span class="lbl">Subnetz</span>        <span id="cur-eth-sn"  class="val">--</span>
+      <span class="lbl">Verbindung</span>     <span id="cur-eth-state" class="val">--</span>
+      <span class="lbl">Access-Point IP</span><span id="cur-ap-ip"   class="val">--</span>
+      <span class="lbl">ETH MAC-Adresse</span><span id="cur-eth-mac" class="val">--</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Ethernet / Statische IP</h3>
     <form id="net-form">
       <div class="form-row"><label>DHCP</label><input type="checkbox" id="use-dhcp" checked></div>
       <div class="form-row"><label>Statische IP</label><input type="text" id="static-ip" placeholder="192.168.1.50"></div>
@@ -95,9 +112,20 @@
       <button type="submit" class="btn">Speichern &amp; Neustart</button>
     </form>
   </div>
+
+  <div class="card">
+    <h3>WLAN Access Point (Konfigurationsmodus)</h3>
+    <p class="note">Wird aktiviert wenn kein Ethernet verfügbar ist. IP: 192.168.4.1</p>
+    <form id="ap-form">
+      <div class="form-row"><label>SSID</label><input type="text" id="ap-ssid" placeholder="Bienenwaage3-Setup"></div>
+      <div class="form-row"><label>Passwort</label><input type="password" id="ap-password" placeholder="min. 8 Zeichen"></div>
+      <button type="submit" class="btn">Speichern &amp; Neustart</button>
+    </form>
+  </div>
+
 </div>
 
-<!-- ── MQTT ───────────────────────────────────────────────────────────────── -->
+<!-- ── MQTT ────────────────────────────────────────────────────────────── -->
 <div id="tab-mqtt" class="tab-content">
   <div class="card">
     <h3>MQTT-Broker</h3>
@@ -127,7 +155,7 @@ function saveNetworkFromMqttForm() {
 }
 </script>
 
-<!-- ── LCD ────────────────────────────────────────────────────────────────── -->
+<!-- ── LCD ─────────────────────────────────────────────────────────────── -->
 <div id="tab-lcd" class="tab-content">
   <div class="card">
     <h3>LCD-Anzeige (live)</h3>
@@ -138,7 +166,7 @@ function saveNetworkFromMqttForm() {
   </div>
 </div>
 
-<!-- ── Parameter ─────────────────────────────────────────────────────────── -->
+<!-- ── Parameter ──────────────────────────────────────────────────────── -->
 <div id="tab-param" class="tab-content">
   <div class="card">
     <h3>Import / Export</h3>
@@ -148,18 +176,16 @@ function saveNetworkFromMqttForm() {
   </div>
   <div class="card">
     <h3>Werkseinstellungen</h3>
-    <p style="color:#aaa;margin-bottom:8px;">Alle Parameter und Kalibrierungen werden gelöscht.</p>
+    <p class="note">Alle Parameter und Kalibrierungen werden gelöscht und auf Standardwerte zurückgesetzt.</p>
     <button class="btn danger" onclick="factoryReset()">Werkseinstellungen wiederherstellen</button>
   </div>
 </div>
 
-<!-- ── Firmware ───────────────────────────────────────────────────────────── -->
+<!-- ── Firmware ────────────────────────────────────────────────────────── -->
 <div id="tab-firmware" class="tab-content">
   <div class="card">
     <h3>OTA Firmware-Update (Browser)</h3>
-    <p style="color:#aaa;margin-bottom:8px;">
-      .bin-Datei aus PlatformIO-Build-Verzeichnis: <code>.pio/build/wt32-eth01/firmware.bin</code>
-    </p>
+    <p class="note">Binary aus: <code>.pio/build/wt32-eth01/firmware.bin</code></p>
     <form id="ota-form">
       <input type="file" id="ota-file" accept=".bin" required>
       <button type="submit" class="btn">Upload &amp; Neustart</button>

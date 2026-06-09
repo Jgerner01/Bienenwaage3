@@ -2,6 +2,8 @@
 // Autor: Johann Gerner
 
 #include "web_server.h"
+#include "web_content.h"
+#include "build_number.h"
 #include "hx711_multi.h"
 #include "temperature.h"
 #include "lcd_display.h"
@@ -12,6 +14,7 @@
 #include <LittleFS.h>
 #include <Update.h>
 #include <ArduinoOTA.h>
+#include <WiFi.h>
 
 extern Hx711Multi       hx711;
 extern TemperatureSensor tempSensor;
@@ -19,6 +22,56 @@ extern LcdDisplay        lcd;
 extern EthWifiManager    network;
 extern MqttManager       mqttClient;
 extern StorageManager    storage;
+
+// ── Wiederherstellungsseite (PROGMEM) – wird angezeigt wenn LittleFS leer ist ──
+static const char RECOVERY_PAGE[] PROGMEM = R"html(
+<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>Bienenwaage3 – Wiederherstellung</title>
+<style>
+body{font-family:sans-serif;background:#1a1a2e;color:#eee;padding:20px;max-width:520px;margin:auto}
+h1{color:#e94560}h3{color:#ccc;margin-top:0}
+.card{background:#16213e;border-radius:8px;padding:20px;margin:12px 0}
+.warn{color:#f90;margin-bottom:16px}
+input[type=file]{display:block;margin:10px 0;color:#eee}
+button{background:#e94560;color:#fff;border:none;padding:8px 18px;border-radius:4px;cursor:pointer;font-size:14px}
+progress{width:100%;height:10px;margin-top:8px;display:none}
+.ok{color:#4caf50}.err{color:#e94560}
+</style></head><body>
+<h1>Bienenwaage3</h1>
+<p class="warn">&#9888; Weboberfläche fehlt (LittleFS leer).<br>
+Bitte zuerst <b>littlefs.bin</b> hochladen, danach ist die Seite verfügbar.</p>
+<div class="card">
+  <h3>Webdateien hochladen &ndash; <code>littlefs.bin</code></h3>
+  <input type="file" id="fs-file" accept=".bin">
+  <button onclick="upload('fs-file','/update-fs','fs-p','fs-s')">LittleFS hochladen &amp; Neustart</button>
+  <progress id="fs-p"></progress><div id="fs-s"></div>
+</div>
+<div class="card">
+  <h3>Firmware aktualisieren &ndash; <code>firmware.bin</code></h3>
+  <input type="file" id="fw-file" accept=".bin">
+  <button onclick="upload('fw-file','/update','fw-p','fw-s')">Firmware hochladen &amp; Neustart</button>
+  <progress id="fw-p"></progress><div id="fw-s"></div>
+</div>
+<script>
+function upload(fileId,url,barId,statusId){
+  var f=document.getElementById(fileId).files[0];
+  if(!f){alert('Keine Datei gewählt');return;}
+  var fd=new FormData();fd.append('file',f);
+  var xhr=new XMLHttpRequest();
+  xhr.open('POST',url);
+  xhr.upload.onprogress=function(e){
+    var b=document.getElementById(barId);
+    b.style.display='block';b.value=e.loaded;b.max=e.total;
+  };
+  xhr.onload=function(){
+    var s=document.getElementById(statusId);
+    if(xhr.status===200){s.innerHTML='<span class="ok">&#10003; Erfolgreich – ESP startet neu…</span>';}
+    else{s.innerHTML='<span class="err">Fehler: '+xhr.responseText+'</span>';}
+  };
+  xhr.send(fd);
+}
+</script></body></html>
+)html";
 
 // ── begin ──────────────────────────────────────────────────────────────────────
 
@@ -50,11 +103,19 @@ void WebServerManager::begin() {
 // ── Routen ─────────────────────────────────────────────────────────────────────
 
 void WebServerManager::_setupRoutes() {
-    // Statische Dateien aus LittleFS
-    _server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
+    // Webseiten aus PROGMEM – kein LittleFS-Image nötig
+    _server.on("/",          HTTP_GET, [](AsyncWebServerRequest* req) {
+        req->send(200, "text/html",       WEB_INDEX_HTML); });
+    _server.on("/index.html",HTTP_GET, [](AsyncWebServerRequest* req) {
+        req->send(200, "text/html",       WEB_INDEX_HTML); });
+    _server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest* req) {
+        req->send(200, "text/css",        WEB_STYLE_CSS); });
+    _server.on("/app.js",    HTTP_GET, [](AsyncWebServerRequest* req) {
+        req->send(200, "application/javascript", WEB_APP_JS); });
 
     // JSON-Daten für AJAX
-    _server.on("/data", HTTP_GET, [this](AsyncWebServerRequest* r) { _handleData(r); });
+    _server.on("/data",   HTTP_GET, [this](AsyncWebServerRequest* r) { _handleData(r); });
+    _server.on("/config", HTTP_GET, [this](AsyncWebServerRequest* r) { _handleConfig(r); });
     _server.on("/status", HTTP_GET, [this](AsyncWebServerRequest* r) { _handleStatus(r); });
     _server.on("/export", HTTP_GET, [this](AsyncWebServerRequest* r) { _handleExport(r); });
 
@@ -96,11 +157,18 @@ void WebServerManager::_setupRoutes() {
             _handleReset(r, d, l);
         });
 
-    // OTA-Upload (Methode B – Browser)
+    // OTA-Upload Firmware (Methode B – Browser)
     _server.on("/update", HTTP_POST,
         [this](AsyncWebServerRequest* r) { _handleOtaResponse(r); },
         [this](AsyncWebServerRequest* r, const String& fn, size_t idx, uint8_t* d, size_t l, bool fin) {
             _handleOtaUpload(r, fn, idx, d, l, fin);
+        });
+
+    // OTA-Upload LittleFS-Image (Browser – auch von Wiederherstellungsseite)
+    _server.on("/update-fs", HTTP_POST,
+        [this](AsyncWebServerRequest* r) { _handleFsResponse(r); },
+        [this](AsyncWebServerRequest* r, const String& fn, size_t idx, uint8_t* d, size_t l, bool fin) {
+            _handleFsUpload(r, fn, idx, d, l, fin);
         });
 }
 
@@ -129,11 +197,40 @@ void WebServerManager::_handleData(AsyncWebServerRequest* req) {
     doc["lcd"]["line1"] = lcd.getLine(0);
     doc["lcd"]["line2"] = lcd.getLine(1);
 
-    doc["network"]["eth_ip"]        = network.getLocalIp();
-    doc["network"]["eth_state"]     = (int)network.getState();
-    doc["network"]["mqtt_connected"]= mqttClient.isConnected();
+    doc["network"]["eth_ip"]         = network.getLocalIp();
+    doc["network"]["eth_gateway"]    = ETH.gatewayIP().toString();
+    doc["network"]["eth_subnet"]     = ETH.subnetMask().toString();
+    doc["network"]["eth_mac"]        = ETH.macAddress();
+    doc["network"]["ap_ip"]          = WiFi.softAPIP().toString();
+    doc["network"]["eth_state"]      = (int)network.getState();
+    doc["network"]["mqtt_connected"] = mqttClient.isConnected();
 
     doc["uptime_s"] = millis() / 1000;
+
+    String body;
+    serializeJson(doc, body);
+    req->send(200, "application/json", body);
+}
+
+// ── /config ────────────────────────────────────────────────────────────────────
+
+void WebServerManager::_handleConfig(AsyncWebServerRequest* req) {
+    const NetworkConfig& cfg = network.getConfig();
+    JsonDocument doc;
+
+    doc["useDhcp"]      = cfg.useDhcp;
+    doc["staticIp"]     = cfg.staticIp;
+    doc["gateway"]      = cfg.gateway;
+    doc["subnet"]       = cfg.subnet;
+    doc["apSsid"]       = cfg.apSsid;
+    doc["apPassword"]   = cfg.apPassword;
+    doc["mqttServer"]   = cfg.mqttServer;
+    doc["mqttPort"]     = cfg.mqttPort;
+    doc["mqttUser"]     = cfg.mqttUser;
+    doc["mqttPassword"] = cfg.mqttPassword;
+    doc["mqttPrefix"]   = cfg.mqttPrefix;
+    doc["haDiscovery"]  = cfg.haDiscovery;
+    doc["mqttRetain"]   = cfg.mqttRetain;
 
     String body;
     serializeJson(doc, body);
@@ -147,7 +244,8 @@ void WebServerManager::_handleStatus(AsyncWebServerRequest* req) {
     doc["eth_state"]      = (int)network.getState();
     doc["eth_ip"]         = network.getLocalIp();
     doc["mqtt_connected"] = mqttClient.isConnected();
-    doc["fw_version"]     = FIRMWARE_VERSION;
+    doc["fw_version"]     = FW_VERSION;
+    doc["build"]          = BUILD_NUMBER;
     doc["uptime_s"]       = millis() / 1000;
 
     String body;
@@ -184,6 +282,8 @@ void WebServerManager::_handleSet(AsyncWebServerRequest* req, uint8_t* data, siz
     if (doc.containsKey("network")) {
         NetworkConfig cfg = network.getConfig();
         JsonVariant n = doc["network"];
+        if (n.containsKey("apSsid"))       cfg.apSsid       = n["apSsid"].as<String>();
+        if (n.containsKey("apPassword"))   cfg.apPassword   = n["apPassword"].as<String>();
         if (n.containsKey("useDhcp"))      cfg.useDhcp      = n["useDhcp"];
         if (n.containsKey("staticIp"))     cfg.staticIp     = n["staticIp"].as<String>();
         if (n.containsKey("gateway"))      cfg.gateway      = n["gateway"].as<String>();
@@ -270,6 +370,45 @@ void WebServerManager::_handleOtaResponse(AsyncWebServerRequest* req) {
     req->send(200, "application/json", ok ? "{\"ok\":true}" : "{\"error\":\"OTA fehlgeschlagen\"}");
     if (ok) { delay(1000); ESP.restart(); }
 }
+
+// ── LittleFS-Image Upload ──────────────────────────────────────────────────────
+
+void WebServerManager::_handleFsResponse(AsyncWebServerRequest* req) {
+    bool ok = !Update.hasError();
+    req->send(200, "application/json", ok ? "{\"ok\":true}" : "{\"error\":\"FS-Update fehlgeschlagen\"}");
+    if (ok) { delay(1000); ESP.restart(); }
+}
+
+void WebServerManager::_handleFsUpload(AsyncWebServerRequest* /*req*/,
+                                        const String& /*filename*/,
+                                        size_t index, uint8_t* data,
+                                        size_t len, bool final) {
+    if (index == 0) {
+        lcdPrint(0, "FS Upload...");
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_SPIFFS)) {
+#ifdef DEBUG_SERIAL
+            Update.printError(Serial);
+#endif
+        }
+    }
+    Update.write(data, len);
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%u KB", (unsigned)(index + len) / 1024);
+    lcdPrint(1, buf);
+    if (final) {
+        if (Update.end(true)) {
+            lcdPrint(0, "FS OK");
+            lcdPrint(1, "Neustart...");
+        } else {
+            lcdPrint(0, "FS Fehler!");
+#ifdef DEBUG_SERIAL
+            Update.printError(Serial);
+#endif
+        }
+    }
+}
+
+// ── Firmware-Upload ────────────────────────────────────────────────────────────
 
 void WebServerManager::_handleOtaUpload(AsyncWebServerRequest* req,
                                          const String& /*filename*/,

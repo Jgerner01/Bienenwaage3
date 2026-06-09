@@ -13,6 +13,18 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     });
 });
 
+// ── Hilfsfunktionen ────────────────────────────────────────────────────────────
+
+function setText(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+}
+
+function setIfNotFocused(id, value) {
+    const el = document.getElementById(id);
+    if (el && document.activeElement !== el) el.textContent = value;
+}
+
 // ── AJAX /data ─────────────────────────────────────────────────────────────────
 
 async function updateData() {
@@ -66,22 +78,25 @@ function renderTemperature(t) {
 function renderLcd(lcd) {
     const l1 = document.getElementById('lcd-line1');
     const l2 = document.getElementById('lcd-line2');
-    // LCD-Zeilen nur setzen, kein Fokus-Problem (keine Eingabefelder)
     if (l1) l1.textContent = lcd.line1.padEnd(16).substring(0, 16);
     if (l2) l2.textContent = lcd.line2.padEnd(16).substring(0, 16);
 }
 
 function renderNetworkStatus(net) {
-    const el = document.getElementById('eth-ip');
-    if (el) el.textContent = net.eth_ip;
+    // Status-Tab
+    setText('eth-ip', net.eth_ip || '--');
     const mqttDot = document.getElementById('mqtt-dot');
     if (mqttDot) mqttDot.className = 'dot' + (net.mqtt_connected ? ' online' : '');
-}
 
-// Eingabefeld nur überschreiben wenn nicht fokussiert
-function setIfNotFocused(id, value) {
-    const el = document.getElementById(id);
-    if (el && document.activeElement !== el) el.textContent = value;
+    // WLAN/ETH-Tab – aktueller Status
+    setText('cur-eth-ip',    net.eth_ip      || '--');
+    setText('cur-eth-gw',    net.eth_gateway || '--');
+    setText('cur-eth-sn',    net.eth_subnet  || '--');
+    setText('cur-ap-ip',     net.ap_ip       || '--');
+    setText('cur-eth-mac',   net.eth_mac     || '--');
+
+    const states = ['Verbinde…', 'Verbunden', 'Getrennt'];
+    setText('cur-eth-state', states[net.eth_state] || '--');
 }
 
 // ── Tara / Kalibrierung ────────────────────────────────────────────────────────
@@ -127,7 +142,11 @@ function importParams() {
     document.getElementById('import-file').click();
 }
 
+// ── DOMContentLoaded ───────────────────────────────────────────────────────────
+
 document.addEventListener('DOMContentLoaded', () => {
+
+    // Import-Datei
     const importFile = document.getElementById('import-file');
     if (importFile) {
         importFile.addEventListener('change', async (e) => {
@@ -160,28 +179,63 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Netzwerk-Formular
+    // Netzwerk-Formular (ETH/IP)
     const netForm = document.getElementById('net-form');
     if (netForm) {
         netForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const cfg = {
-                useDhcp:      document.getElementById('use-dhcp').checked,
-                staticIp:     document.getElementById('static-ip').value,
-                gateway:      document.getElementById('gateway').value,
-                subnet:       document.getElementById('subnet').value,
-                mqttServer:   document.getElementById('mqtt-server').value,
-                mqttPort:     parseInt(document.getElementById('mqtt-port').value),
-                mqttUser:     document.getElementById('mqtt-user').value,
-                mqttPassword: document.getElementById('mqtt-password').value,
-                mqttPrefix:   document.getElementById('mqtt-prefix').value,
-                haDiscovery:  document.getElementById('ha-discovery').checked,
-                mqttRetain:   document.getElementById('mqtt-retain').checked
+                useDhcp:  document.getElementById('use-dhcp').checked,
+                staticIp: document.getElementById('static-ip').value,
+                gateway:  document.getElementById('gateway').value,
+                subnet:   document.getElementById('subnet').value
             };
             sendSet({ network: cfg }).then(() => alert('Gespeichert – Neustart...'));
         });
     }
 
+    // AP-Formular
+    const apForm = document.getElementById('ap-form');
+    if (apForm) {
+        apForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            sendSet({ network: {
+                apSsid:     document.getElementById('ap-ssid').value,
+                apPassword: document.getElementById('ap-password').value
+            }}).then(() => alert('Gespeichert – Neustart...'));
+        });
+    }
+
+    // Konfigurationsfelder einmalig befüllen
+    fetch('/config').then(r => r.json()).then(cfg => {
+        const set = (id, val) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (el.type === 'checkbox') el.checked = val;
+            else el.value = val || '';
+        };
+        set('use-dhcp',      cfg.useDhcp);
+        set('static-ip',     cfg.staticIp);
+        set('gateway',       cfg.gateway);
+        set('subnet',        cfg.subnet);
+        set('ap-ssid',       cfg.apSsid);
+        set('ap-password',   cfg.apPassword);
+        set('mqtt-server',   cfg.mqttServer);
+        set('mqtt-port',     cfg.mqttPort);
+        set('mqtt-user',     cfg.mqttUser);
+        set('mqtt-password', cfg.mqttPassword);
+        set('mqtt-prefix',   cfg.mqttPrefix);
+        set('ha-discovery',  cfg.haDiscovery);
+        set('mqtt-retain',   cfg.mqttRetain);
+    }).catch(() => {});
+
+    // Firmware-Version + Build-Nummer aus /status
+    fetch('/status').then(r => r.json()).then(s => {
+        const el = document.getElementById('fw-info');
+        if (el) el.textContent = `Firmware v${s.fw_version} / Build ${s.build}`;
+    }).catch(() => {});
+
+    // Erster Datenabruf + periodisches Update
     updateData();
     setInterval(updateData, UPDATE_INTERVAL_MS);
 });

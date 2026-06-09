@@ -7,7 +7,7 @@
 #include <stdint.h>
 
 // ── Versionierung ──────────────────────────────────────────────────────────────
-#define FW_VERSION        "1.0.0"
+#define FW_VERSION        "1.1.0"
 #define PARAM_FORMAT_VER  1          // JSON-Exportformat-Version
 
 // ── HX711 – Pins ──────────────────────────────────────────────────────────────
@@ -63,7 +63,7 @@ constexpr uint8_t HX711_DOUT_PINS[HX711_MAX_MODULES] = {
 
 // ── Netzwerk – WiFi Access Point (Fallback/Konfiguration) ────────────────────
 #define WIFI_AP_SSID      "Bienenwaage3-Setup"
-#define WIFI_AP_PASSWORD  "bienenwaage"
+#define WIFI_AP_PASSWORD  "12345678"
 #define WIFI_AP_IP        "192.168.4.1"
 
 // ── Netzwerk – Reconnect-Timing ───────────────────────────────────────────────
