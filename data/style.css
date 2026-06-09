@@ -1,0 +1,57 @@
+/* Bienenwaage3 – Stylesheet */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: monospace; background: #1a1a1a; color: #e0e0e0; font-size: 14px; }
+
+/* Tabs */
+.tabs { display: flex; background: #111; border-bottom: 2px solid #f90; }
+.tab-btn { padding: 10px 18px; background: none; border: none; color: #aaa; cursor: pointer; font: inherit; font-size: 13px; }
+.tab-btn.active { color: #f90; border-bottom: 2px solid #f90; margin-bottom: -2px; }
+.tab-btn:hover { color: #fff; }
+.tab-content { display: none; padding: 16px; }
+.tab-content.active { display: block; }
+
+/* Karten */
+.card { background: #242424; border: 1px solid #333; border-radius: 6px; padding: 12px; margin-bottom: 12px; }
+.card h3 { color: #f90; margin-bottom: 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
+
+/* Modulzeilen */
+.module-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid #333; }
+.module-row:last-child { border-bottom: none; }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: #555; flex-shrink: 0; }
+.dot.online { background: #3d3; }
+.module-name { width: 80px; color: #aaa; }
+.module-weight { width: 110px; font-size: 16px; font-weight: bold; color: #fff; }
+.module-sigma { width: 80px; color: #888; font-size: 12px; }
+.module-quick { width: 100px; color: #aaa; font-size: 12px; }
+
+/* LCD-Simulation */
+.lcd-frame { display: inline-block; background: #2a5c1a; border: 4px solid #1a3a0a; border-radius: 4px; padding: 8px 12px; font-family: 'Courier New', monospace; box-shadow: inset 0 0 6px rgba(0,0,0,0.5); }
+.lcd-line { display: block; color: #080; text-shadow: 0 0 4px #3f3; font-size: 18px; letter-spacing: 2px; line-height: 1.6; white-space: pre; width: 16ch; }
+
+/* Formulare */
+label { display: inline-block; width: 160px; color: #aaa; margin: 4px 0; }
+input[type=text], input[type=number], input[type=password] {
+    background: #1a1a1a; border: 1px solid #444; color: #e0e0e0;
+    padding: 4px 8px; border-radius: 3px; width: 180px; font: inherit;
+}
+input[type=checkbox] { margin-right: 6px; }
+.form-row { margin: 6px 0; }
+button.btn { background: #f90; border: none; color: #000; padding: 7px 16px; border-radius: 4px;
+             cursor: pointer; font: inherit; font-weight: bold; margin: 4px 2px; }
+button.btn:hover { background: #ffa020; }
+button.btn.danger { background: #c33; color: #fff; }
+button.btn.danger:hover { background: #e44; }
+button.btn.secondary { background: #444; color: #e0e0e0; }
+button.btn.secondary:hover { background: #555; }
+
+/* Verbindungsstatus */
+.status-bar { display: flex; gap: 16px; align-items: center; padding: 6px 0; }
+.status-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #888; }
+.status-item .dot { width: 8px; height: 8px; }
+
+/* Fortschrittsbalken OTA */
+#ota-progress { display: none; margin-top: 8px; }
+progress { width: 100%; height: 16px; }
+
+/* Temperaturanzeige */
+.temp-value { font-size: 22px; color: #6cf; font-weight: bold; }

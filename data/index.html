@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bienenwaage3</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="status">Status</button>
+  <button class="tab-btn" data-tab="waagen">Waagen</button>
+  <button class="tab-btn" data-tab="netz">WLAN/ETH</button>
+  <button class="tab-btn" data-tab="mqtt">MQTT</button>
+  <button class="tab-btn" data-tab="lcd">LCD</button>
+  <button class="tab-btn" data-tab="param">Parameter</button>
+  <button class="tab-btn" data-tab="firmware">Firmware</button>
+</div>
+
+<!-- ── Status ─────────────────────────────────────────────────────────────── -->
+<div id="tab-status" class="tab-content active">
+  <div class="card">
+    <h3>Module</h3>
+    <div id="module-list"></div>
+  </div>
+  <div class="card">
+    <h3>Temperatur</h3>
+    <div class="status-item">
+      <span class="dot" id="temp-dot"></span>
+      <span class="temp-value" id="temp-value">--</span>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Verbindung</h3>
+    <div class="status-bar">
+      <div class="status-item">ETH: <span id="eth-ip">--</span></div>
+      <div class="status-item"><span class="dot" id="mqtt-dot"></span> MQTT</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Waagen ─────────────────────────────────────────────────────────────── -->
+<div id="tab-waagen" class="tab-content">
+  <div id="waagen-config">
+    <!-- Per Modul: wird per JS befüllt oder statisch für alle 7 Module -->
+    <script>
+    for (let i = 0; i < 7; i++) {
+      document.write(`
+      <div class="card">
+        <h3>Modul ${i+1} (GPIO ${[14,13,17,15,2,34,35][i]})</h3>
+        <div class="form-row">
+          <label>Aktiv</label>
+          <input type="checkbox" id="m${i}-active" onchange="sendSet({module:${i},active:this.checked})">
+        </div>
+        <div class="form-row">
+          <label>Kalibrierfaktor</label>
+          <input type="number" id="m${i}-calib" step="0.0001" placeholder="g/ADC">
+          <button class="btn secondary" onclick="sendSet({module:${i},calibFactor:parseFloat(document.getElementById('m${i}-calib').value)})">Übernehmen</button>
+        </div>
+        <div class="form-row">
+          <label>Bekanntes Gewicht [g]</label>
+          <input type="number" id="m${i}-known" step="1" placeholder="z.B. 5000">
+          <button class="btn" onclick="sendCalibrate(${i}, document.getElementById('m${i}-known').value)">Kalibrieren</button>
+        </div>
+        <div class="form-row">
+          <button class="btn secondary" onclick="sendTare(${i},'main')">Grundtara</button>
+          <button class="btn secondary" onclick="sendTare(${i},'yield')">Ertragstara</button>
+          <button class="btn secondary" onclick="sendTare(${i},'clear_yield')">Ertragstara löschen</button>
+        </div>
+        <div class="form-row">
+          <label>Poly a2 (g/°C²)</label>
+          <input type="number" id="m${i}-a2" step="0.001">
+          <label>a1 (g/°C)</label>
+          <input type="number" id="m${i}-a1" step="0.01">
+          <label>a0 (g)</label>
+          <input type="number" id="m${i}-a0" step="0.1">
+          <button class="btn secondary" onclick="sendSet({module:${i},polyA2:parseFloat(document.getElementById('m${i}-a2').value),polyA1:parseFloat(document.getElementById('m${i}-a1').value),polyA0:parseFloat(document.getElementById('m${i}-a0').value)})">Speichern</button>
+        </div>
+      </div>`);
+    }
+    </script>
+  </div>
+</div>
+
+<!-- ── WLAN/ETH ────────────────────────────────────────────────────────────── -->
+<div id="tab-netz" class="tab-content">
+  <div class="card">
+    <h3>Ethernet / IP</h3>
+    <form id="net-form">
+      <div class="form-row"><label>DHCP</label><input type="checkbox" id="use-dhcp" checked></div>
+      <div class="form-row"><label>Statische IP</label><input type="text" id="static-ip" placeholder="192.168.1.50"></div>
+      <div class="form-row"><label>Gateway</label><input type="text" id="gateway" placeholder="192.168.1.1"></div>
+      <div class="form-row"><label>Subnetz</label><input type="text" id="subnet" placeholder="255.255.255.0"></div>
+      <button type="submit" class="btn">Speichern &amp; Neustart</button>
+    </form>
+  </div>
+</div>
+
+<!-- ── MQTT ───────────────────────────────────────────────────────────────── -->
+<div id="tab-mqtt" class="tab-content">
+  <div class="card">
+    <h3>MQTT-Broker</h3>
+    <form id="net-form-mqtt" onsubmit="event.preventDefault(); saveNetworkFromMqttForm()">
+      <div class="form-row"><label>Broker-IP</label><input type="text" id="mqtt-server" placeholder="192.168.1.x"></div>
+      <div class="form-row"><label>Port</label><input type="number" id="mqtt-port" value="1883"></div>
+      <div class="form-row"><label>Benutzer</label><input type="text" id="mqtt-user"></div>
+      <div class="form-row"><label>Passwort</label><input type="password" id="mqtt-password"></div>
+      <div class="form-row"><label>Topic-Präfix</label><input type="text" id="mqtt-prefix" value="bienenwaage3"></div>
+      <div class="form-row"><label>HA Auto-Discovery</label><input type="checkbox" id="ha-discovery" checked></div>
+      <div class="form-row"><label>Retain</label><input type="checkbox" id="mqtt-retain" checked></div>
+      <button type="submit" class="btn">Speichern &amp; Neustart</button>
+    </form>
+  </div>
+</div>
+<script>
+function saveNetworkFromMqttForm() {
+  sendSet({ network: {
+    mqttServer:   document.getElementById('mqtt-server').value,
+    mqttPort:     parseInt(document.getElementById('mqtt-port').value),
+    mqttUser:     document.getElementById('mqtt-user').value,
+    mqttPassword: document.getElementById('mqtt-password').value,
+    mqttPrefix:   document.getElementById('mqtt-prefix').value,
+    haDiscovery:  document.getElementById('ha-discovery').checked,
+    mqttRetain:   document.getElementById('mqtt-retain').checked
+  }}).then(() => alert('Gespeichert – Neustart...'));
+}
+</script>
+
+<!-- ── LCD ────────────────────────────────────────────────────────────────── -->
+<div id="tab-lcd" class="tab-content">
+  <div class="card">
+    <h3>LCD-Anzeige (live)</h3>
+    <div class="lcd-frame">
+      <span class="lcd-line" id="lcd-line1">                </span>
+      <span class="lcd-line" id="lcd-line2">                </span>
+    </div>
+  </div>
+</div>
+
+<!-- ── Parameter ─────────────────────────────────────────────────────────── -->
+<div id="tab-param" class="tab-content">
+  <div class="card">
+    <h3>Import / Export</h3>
+    <button class="btn secondary" onclick="exportParams()">Parameter exportieren</button>
+    <button class="btn secondary" onclick="importParams()">Parameter importieren</button>
+    <input type="file" id="import-file" accept=".json" style="display:none">
+  </div>
+  <div class="card">
+    <h3>Werkseinstellungen</h3>
+    <p style="color:#aaa;margin-bottom:8px;">Alle Parameter und Kalibrierungen werden gelöscht.</p>
+    <button class="btn danger" onclick="factoryReset()">Werkseinstellungen wiederherstellen</button>
+  </div>
+</div>
+
+<!-- ── Firmware ───────────────────────────────────────────────────────────── -->
+<div id="tab-firmware" class="tab-content">
+  <div class="card">
+    <h3>OTA Firmware-Update (Browser)</h3>
+    <p style="color:#aaa;margin-bottom:8px;">
+      .bin-Datei aus PlatformIO-Build-Verzeichnis: <code>.pio/build/wt32-eth01/firmware.bin</code>
+    </p>
+    <form id="ota-form">
+      <input type="file" id="ota-file" accept=".bin" required>
+      <button type="submit" class="btn">Upload &amp; Neustart</button>
+    </form>
+    <div id="ota-progress"><progress id="ota-bar" value="0" max="100"></progress></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
