@@ -217,6 +217,36 @@ function saveNetworkFromMqttForm() {
 
 <!-- ── Parameter ──────────────────────────────────────────────────────── -->
 <div id="tab-param" class="tab-content">
+
+  <div class="card">
+    <h3>Messfilter-Parameter</h3>
+    <p class="note">
+      Medianfenster: Anzahl gepufferter Rohwerte pro Modul (Standard: 100, Trim je 20 oben/unten).
+      Outlier-Schwelle: max. zulässiger Sprung zwischen zwei Messungen in g/s (Standard: 100).
+    </p>
+    <div class="filter-table">
+      <div class="filter-header">
+        <span class="filter-mod"></span>
+        <span class="filter-lbl-head">Medianfenster</span>
+        <span class="filter-lbl-head">Outlier [g/s]</span>
+        <span></span>
+      </div>
+      <script>
+      for (let i = 0; i < 7; i++) {
+        document.write(`
+        <div class="filter-row">
+          <span class="filter-mod">Modul ${i+1}</span>
+          <input type="number" id="m${i}-bufsize" min="20" max="500" step="10"
+                 class="filter-input" placeholder="100">
+          <input type="number" id="m${i}-outlier" min="1" max="10000" step="1"
+                 class="filter-input" placeholder="100">
+          <button class="btn secondary" onclick="saveFilterParams(${i}, this)">Speichern</button>
+        </div>`);
+      }
+      </script>
+    </div>
+  </div>
+
   <div class="card">
     <h3>Import / Export</h3>
     <button class="btn secondary" onclick="exportParams()">Parameter exportieren</button>

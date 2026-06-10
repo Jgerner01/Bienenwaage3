@@ -206,6 +206,8 @@ void WebServerManager::_handleData(AsyncWebServerRequest* req) {
         o["tare_main_g"]    = m.tareMain_g;
         o["tare_yield_g"]   = m.tareYield_g;
         o["online"]         = m.online;
+        o["buf_size"]       = m.mainBufferSize;
+        o["outlier_thresh"] = m.outlierThresh;
     }
 
     doc["temperature"]["value_c"] = tempSensor.getTemperature();

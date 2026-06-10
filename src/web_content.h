@@ -223,6 +223,36 @@ function saveNetworkFromMqttForm() {
 
 <!-- ── Parameter ──────────────────────────────────────────────────────── -->
 <div id="tab-param" class="tab-content">
+
+  <div class="card">
+    <h3>Messfilter-Parameter</h3>
+    <p class="note">
+      Medianfenster: Anzahl gepufferter Rohwerte pro Modul (Standard: 100, Trim je 20 oben/unten).
+      Outlier-Schwelle: max. zulässiger Sprung zwischen zwei Messungen in g/s (Standard: 100).
+    </p>
+    <div class="filter-table">
+      <div class="filter-header">
+        <span class="filter-mod"></span>
+        <span class="filter-lbl-head">Medianfenster</span>
+        <span class="filter-lbl-head">Outlier [g/s]</span>
+        <span></span>
+      </div>
+      <script>
+      for (let i = 0; i < 7; i++) {
+        document.write(`
+        <div class="filter-row">
+          <span class="filter-mod">Modul ${i+1}</span>
+          <input type="number" id="m${i}-bufsize" min="20" max="500" step="10"
+                 class="filter-input" placeholder="100">
+          <input type="number" id="m${i}-outlier" min="1" max="10000" step="1"
+                 class="filter-input" placeholder="100">
+          <button class="btn secondary" onclick="saveFilterParams(${i}, this)">Speichern</button>
+        </div>`);
+      }
+      </script>
+    </div>
+  </div>
+
   <div class="card">
     <h3>Import / Export</h3>
     <button class="btn secondary" onclick="exportParams()">Parameter exportieren</button>
@@ -370,6 +400,25 @@ progress { width: 100%; height: 12px; }
 
 /* ── Temperaturanzeige ───────────────────────────────────────────────────── */
 .temp-value { font-size: 22px; color: #2277cc; font-weight: bold; }
+
+/* ── Messfilter-Tabelle (Parameter-Tab) ──────────────────────────────────── */
+.filter-table { display: flex; flex-direction: column; gap: 2px; }
+.filter-header, .filter-row {
+  display: grid;
+  grid-template-columns: 70px 110px 110px auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+}
+.filter-header { border-bottom: 2px solid #f0e8d8; margin-bottom: 4px; }
+.filter-row { border-bottom: 1px solid #f4f4f4; }
+.filter-row:last-child { border-bottom: none; }
+.filter-mod { font-weight: bold; color: #e89010; font-size: 13px; }
+.filter-lbl-head { color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+.filter-input { background: #fafafa; border: 1px solid #ccc; color: #333;
+                padding: 4px 6px; border-radius: 4px; font: inherit; width: 100%; }
+.filter-input:focus { outline: none; border-color: #e89010;
+                      box-shadow: 0 0 0 2px rgba(232,144,16,0.15); }
 )CSSEOF";
 
 static const char WEB_APP_JS[] PROGMEM = R"JSEOF(
@@ -398,6 +447,11 @@ function setText(id, val) {
 function setIfNotFocused(id, value) {
     const el = document.getElementById(id);
     if (el && document.activeElement !== el) el.textContent = value;
+}
+
+function setInputIfNotFocused(id, val) {
+    const el = document.getElementById(id);
+    if (el && document.activeElement !== el) el.value = val;
 }
 
 // ── AJAX /data ─────────────────────────────────────────────────────────────────
@@ -440,6 +494,10 @@ function renderModules(modules) {
         setIfNotFocused('mw-' + m.id, m.online ? (m.weight_g / 1000).toFixed(3) + ' kg' : 'OFFLINE');
         setIfNotFocused('ms-' + m.id, m.online ? ('σ=' + m.sigma_g.toFixed(1) + 'g') : '');
         setIfNotFocused('mq-' + m.id, m.online ? ('~' + (m.weight_quick_g / 1000).toFixed(3) + ' kg') : '');
+
+        // Messfilter-Parameter im Parameter-Tab befüllen
+        setInputIfNotFocused('m' + m.id + '-bufsize', m.buf_size);
+        setInputIfNotFocused('m' + m.id + '-outlier', m.outlier_thresh);
     });
 }
 
@@ -472,6 +530,20 @@ function renderNetworkStatus(net) {
 
     const states = ['Verbinde…', 'Verbunden', 'Getrennt'];
     setText('cur-eth-state', states[net.eth_state] || '--');
+}
+
+// ── Messfilter-Parameter ───────────────────────────────────────────────────────
+
+function saveFilterParams(idx, btn) {
+    const bufSize = parseInt(document.getElementById('m' + idx + '-bufsize').value);
+    const outlier = parseFloat(document.getElementById('m' + idx + '-outlier').value);
+    if (isNaN(bufSize) || isNaN(outlier)) return;
+    sendSet({ module: idx, bufSize, outlier }).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = 'Gespeichert';
+        btn.disabled = true;
+        setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500);
+    });
 }
 
 // ── Tara / Kalibrierung ────────────────────────────────────────────────────────

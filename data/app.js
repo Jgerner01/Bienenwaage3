@@ -25,6 +25,11 @@ function setIfNotFocused(id, value) {
     if (el && document.activeElement !== el) el.textContent = value;
 }
 
+function setInputIfNotFocused(id, val) {
+    const el = document.getElementById(id);
+    if (el && document.activeElement !== el) el.value = val;
+}
+
 // ── AJAX /data ─────────────────────────────────────────────────────────────────
 
 async function updateData() {
@@ -65,6 +70,10 @@ function renderModules(modules) {
         setIfNotFocused('mw-' + m.id, m.online ? (m.weight_g / 1000).toFixed(3) + ' kg' : 'OFFLINE');
         setIfNotFocused('ms-' + m.id, m.online ? ('σ=' + m.sigma_g.toFixed(1) + 'g') : '');
         setIfNotFocused('mq-' + m.id, m.online ? ('~' + (m.weight_quick_g / 1000).toFixed(3) + ' kg') : '');
+
+        // Messfilter-Parameter im Parameter-Tab befüllen
+        setInputIfNotFocused('m' + m.id + '-bufsize', m.buf_size);
+        setInputIfNotFocused('m' + m.id + '-outlier', m.outlier_thresh);
     });
 }
 
@@ -97,6 +106,20 @@ function renderNetworkStatus(net) {
 
     const states = ['Verbinde…', 'Verbunden', 'Getrennt'];
     setText('cur-eth-state', states[net.eth_state] || '--');
+}
+
+// ── Messfilter-Parameter ───────────────────────────────────────────────────────
+
+function saveFilterParams(idx, btn) {
+    const bufSize = parseInt(document.getElementById('m' + idx + '-bufsize').value);
+    const outlier = parseFloat(document.getElementById('m' + idx + '-outlier').value);
+    if (isNaN(bufSize) || isNaN(outlier)) return;
+    sendSet({ module: idx, bufSize, outlier }).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = 'Gespeichert';
+        btn.disabled = true;
+        setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500);
+    });
 }
 
 // ── Tara / Kalibrierung ────────────────────────────────────────────────────────

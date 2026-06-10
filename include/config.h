@@ -7,7 +7,7 @@
 #include <stdint.h>
 
 // ── Versionierung ──────────────────────────────────────────────────────────────
-#define FW_VERSION        "1.2.0"
+#define FW_VERSION        "1.2.1"
 #define PARAM_FORMAT_VER  1          // JSON-Exportformat-Version
 
 // ── HX711 – Pins ──────────────────────────────────────────────────────────────

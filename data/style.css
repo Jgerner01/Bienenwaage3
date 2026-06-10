@@ -113,3 +113,22 @@ progress { width: 100%; height: 12px; }
 
 /* ── Temperaturanzeige ───────────────────────────────────────────────────── */
 .temp-value { font-size: 22px; color: #2277cc; font-weight: bold; }
+
+/* ── Messfilter-Tabelle (Parameter-Tab) ──────────────────────────────────── */
+.filter-table { display: flex; flex-direction: column; gap: 2px; }
+.filter-header, .filter-row {
+  display: grid;
+  grid-template-columns: 70px 110px 110px auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+}
+.filter-header { border-bottom: 2px solid #f0e8d8; margin-bottom: 4px; }
+.filter-row { border-bottom: 1px solid #f4f4f4; }
+.filter-row:last-child { border-bottom: none; }
+.filter-mod { font-weight: bold; color: #e89010; font-size: 13px; }
+.filter-lbl-head { color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+.filter-input { background: #fafafa; border: 1px solid #ccc; color: #333;
+                padding: 4px 6px; border-radius: 4px; font: inherit; width: 100%; }
+.filter-input:focus { outline: none; border-color: #e89010;
+                      box-shadow: 0 0 0 2px rgba(232,144,16,0.15); }
