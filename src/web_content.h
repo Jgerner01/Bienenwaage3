@@ -69,6 +69,7 @@ static const char WEB_INDEX_HTML[] PROGMEM = R"HTMLEOF(
   <button class="tab-btn" data-tab="lcd">LCD</button>
   <button class="tab-btn" data-tab="param">Parameter</button>
   <button class="tab-btn" data-tab="firmware">Firmware</button>
+  <button class="tab-btn" data-tab="test">Test</button>
 </div>
 
 <!-- ── Status ──────────────────────────────────────────────────────────── -->
@@ -242,7 +243,7 @@ function saveNetworkFromMqttForm() {
         document.write(`
         <div class="filter-row">
           <span class="filter-mod">Modul ${i+1}</span>
-          <input type="number" id="m${i}-bufsize" min="20" max="500" step="10"
+          <input type="number" id="m${i}-bufsize" min="20" max="200" step="10"
                  class="filter-input" placeholder="100">
           <input type="number" id="m${i}-outlier" min="1" max="10000" step="1"
                  class="filter-input" placeholder="100">
@@ -276,6 +277,13 @@ function saveNetworkFromMqttForm() {
       <button type="submit" class="btn">Upload &amp; Neustart</button>
     </form>
     <div id="ota-progress"><progress id="ota-bar" value="0" max="100"></progress></div>
+  </div>
+</div>
+
+<!-- ── Test ─────────────────────────────────────────────────────────────── -->
+<div id="tab-test" class="tab-content">
+  <div class="card">
+    <h3>Test</h3>
   </div>
 </div>
 

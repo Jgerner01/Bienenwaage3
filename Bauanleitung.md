@@ -15,7 +15,7 @@
 | 1 | LCD-Display 16×2, I2C (PCF8574) | I2C-Adresse 0x27 |
 | 1 | DS18B20 Temperatursensor | wasserdichte Ausführung empfohlen |
 | 2 | Taster (Schließer) | mit externem Pull-up-Widerstand |
-| 2 | Widerstand 10 kΩ | Pull-up für Taster (GPIO 36 + 39) |
+| 2 | Widerstand 10 kΩ | Pull-down für Taster (GPIO 36 + 39) |
 | 1 | Widerstand 4,7 kΩ | Pull-up für OneWire (DS18B20) |
 | 1 | Netzteil 5 V / mind. 1 A | stabil, mit ausreichend Reserveleistung |
 | 1 | RJ45-Buchse / Patchkabel | für Ethernet-Anschluss |
@@ -82,6 +82,8 @@ Die 3,3-V-Logik wird intern vom Modul erzeugt. HX711-Module können wahlweise mi
 ## 3. Schaltungsaufbau
 
 ### Taster-Beschaltung (gleich für beide Taster)
+
+Da die Software `HIGH` als gedrückt erkennt, ist eine **Pull-down**-Beschaltung erforderlich:
 
 ```
 3,3 V ──┬── 10 kΩ ──┬── GPIO (36 oder 39)

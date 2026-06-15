@@ -7,8 +7,8 @@
 #include <stdint.h>
 
 // ── Versionierung ──────────────────────────────────────────────────────────────
-#define FW_VERSION        "1.2.1"
-#define PARAM_FORMAT_VER  1          // JSON-Exportformat-Version
+#define FW_VERSION        "1.2.2"
+#define PARAM_FORMAT_VER  2          // JSON-Exportformat-Version (2: Tara in ADC-Counts)
 
 // ── HX711 – Pins ──────────────────────────────────────────────────────────────
 #define HX711_SCK_PIN     5          // Gemeinsamer Taktausgang (alle Module)
@@ -32,7 +32,10 @@ constexpr uint8_t HX711_DOUT_PINS[HX711_MAX_MODULES] = {
 #define HX711_QUICK_BUFFER_SIZE   20  // Schnellmessung: Ring-Buffer
 #define HX711_TARE_MAIN_SAMPLES   50  // Grundtara und Ertragstara: Median
 #define HX711_TARE_QUICK_SAMPLES  10  // Schnellmess-Tara: Median
+#define HX711_TARA_BUFFER_SIZE    50  // Max. Sampler-Tiefe (>= alle TARE_*_SAMPLES)
 #define HX711_OUTLIER_THRESHOLD  100.0f  // Max. Sprung [g/s]
+#define HX711_MAIN_BUFFER_MAX    200  // Obergrenze Medianfenster (= MedianFilter::MAX_SIZE)
+#define HX711_ONLINE_TIMEOUT_MS  2000UL  // Modul gilt erst nach dieser Zeit ohne Daten als offline
 
 // ── Temperatur – DS18B20 ───────────────────────────────────────────────────────
 #define ONEWIRE_PIN       4
@@ -77,6 +80,7 @@ constexpr uint8_t HX711_DOUT_PINS[HX711_MAX_MODULES] = {
 // ── MQTT ──────────────────────────────────────────────────────────────────────
 #define MQTT_DEFAULT_PORT       1883
 #define MQTT_KEEPALIVE_S        60
+#define MQTT_SOCKET_TIMEOUT_S   2       // Kurzer Timeout, damit loop() nicht blockiert
 #define MQTT_RECONNECT_INTERVAL 5000UL
 #define MQTT_TOPIC_PREFIX       "bienenwaage3"
 #define MQTT_CLIENT_ID          "bienenwaage3"

@@ -203,8 +203,8 @@ void WebServerManager::_handleData(AsyncWebServerRequest* req) {
         o["weight_g"]       = m.weightMain_g;
         o["weight_quick_g"] = m.weightQuick_g;
         o["sigma_g"]        = m.sigma_g;
-        o["tare_main_g"]    = m.tareMain_g;
-        o["tare_yield_g"]   = m.tareYield_g;
+        o["tare_main_g"]    = m.tareMainAdc  * m.calibFactor;
+        o["tare_yield_g"]   = m.tareYieldAdc * m.calibFactor;
         o["online"]         = m.online;
         o["buf_size"]       = m.mainBufferSize;
         o["outlier_thresh"] = m.outlierThresh;
@@ -281,6 +281,8 @@ void WebServerManager::_handleSet(AsyncWebServerRequest* req, uint8_t* data, siz
         return;
     }
 
+    bool shouldRestart = false;
+
     // Modulparameter
     if (doc.containsKey("module")) {
         uint8_t idx = doc["module"].as<uint8_t>();
@@ -291,9 +293,15 @@ void WebServerManager::_handleSet(AsyncWebServerRequest* req, uint8_t* data, siz
             if (doc.containsKey("polyA2"))      mod.polyA2         = doc["polyA2"];
             if (doc.containsKey("polyA1"))      mod.polyA1         = doc["polyA1"];
             if (doc.containsKey("polyA0"))      mod.polyA0         = doc["polyA0"];
-            if (doc.containsKey("bufSize"))     mod.mainBufferSize = doc["bufSize"];
+            if (doc.containsKey("bufSize")) {
+                int bs = doc["bufSize"];
+                if (bs < 1)                      bs = 1;
+                if (bs > HX711_MAIN_BUFFER_MAX)  bs = HX711_MAIN_BUFFER_MAX;
+                mod.mainBufferSize = bs;
+            }
             if (doc.containsKey("outlier"))     mod.outlierThresh  = doc["outlier"];
-            storage.saveModuleParams(idx, mod);
+            // Live übernehmen UND speichern (wirkt ohne Neustart)
+            hx711.applyModuleParams(idx, mod);
         }
     }
 
@@ -314,10 +322,17 @@ void WebServerManager::_handleSet(AsyncWebServerRequest* req, uint8_t* data, siz
         if (n.containsKey("mqttPrefix"))   cfg.mqttPrefix   = n["mqttPrefix"].as<String>();
         if (n.containsKey("haDiscovery"))  cfg.haDiscovery  = n["haDiscovery"];
         if (n.containsKey("mqttRetain"))   cfg.mqttRetain   = n["mqttRetain"];
-        network.applyNetworkConfig(cfg); // speichert + startet neu
+        storage.saveNetworkConfig(cfg);
+        shouldRestart = true;
     }
 
     req->send(200, "application/json", "{\"ok\":true}");
+
+    // Netzwerkänderungen (IP/AP/MQTT) erst nach gesendeter Antwort übernehmen
+    if (shouldRestart) {
+        delay(200);
+        ESP.restart();
+    }
 }
 
 // ── /tare ──────────────────────────────────────────────────────────────────────

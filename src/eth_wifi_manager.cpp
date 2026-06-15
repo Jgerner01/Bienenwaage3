@@ -26,16 +26,7 @@ void EthWifiManager::begin() {
     // ── Schritt 1: WiFi-Modus vor ETH.begin() ─────────────────────────────────
     Serial.printf("[NET] WiFi Mode vor ETH.begin(): %d\n", (int)WiFi.getMode());
 
-    // ── Schritt 2: ETH einmalig initialisieren ─────────────────────────────────
-    Serial.println("[NET] Rufe ETH.begin() auf...");
-    bool ethBeginOk = ETH.begin(
-        ETH_PHY_ADDR, ETH_PHY_POWER, ETH_PHY_MDC, ETH_PHY_MDIO,
-        ETH_PHY_LAN8720, ETH_CLOCK_GPIO0_IN
-    );
-    Serial.printf("[NET] ETH.begin() = %d\n", (int)ethBeginOk);
-    Serial.printf("[NET] WiFi Mode nach ETH.begin(): %d  (0=OFF 1=STA 2=AP 3=APSTA)\n",
-                  (int)WiFi.getMode());
-
+    // ── Schritt 2: Statische IP konfigurieren BEVOR ETH gestartet wird ────────
     if (!_cfg.useDhcp && _cfg.staticIp.length() > 0) {
         IPAddress ip, gw, sn;
         ip.fromString(_cfg.staticIp);
@@ -44,6 +35,15 @@ void EthWifiManager::begin() {
         ETH.config(ip, gw, sn);
         Serial.printf("[NET] Statische IP konfiguriert: %s\n", _cfg.staticIp.c_str());
     }
+
+    // ── Schritt 3: ETH einmalig initialisieren ─────────────────────────────────
+    Serial.println("[NET] Rufe ETH.begin() auf...");
+    bool ethBeginOk = ETH.begin(
+        ETH_PHY_ADDR, ETH_PHY_POWER, ETH_PHY_MDC, ETH_PHY_MDIO,
+        ETH_PHY_LAN8720, ETH_CLOCK_GPIO0_IN
+    );
+    Serial.printf("[NET] ETH.begin() = %d\n", (int)ethBeginOk);
+    Serial.printf("[NET] WiFi Mode nach ETH.begin(): %d\n", (int)WiFi.getMode());
 
     // 100 ms warten bis ETH-Init intern abgeschlossen
     delay(100);

@@ -28,8 +28,8 @@ void StorageManager::loadModuleParams(uint8_t idx, ModuleData& mod) {
 
     mod.active          = prefs.getBool("active",   false);
     mod.calibFactor     = prefs.getFloat("calib",   1.0f);
-    mod.tareMain_g      = prefs.getFloat("tareM",   0.0f);
-    mod.tareYield_g     = prefs.getFloat("tareY",   0.0f);
+    mod.tareMainAdc     = prefs.getFloat("tareMa",  0.0f);
+    mod.tareYieldAdc    = prefs.getFloat("tareYa",  0.0f);
     mod.polyA2          = prefs.getFloat("polyA2",  TEMP_POLY_A2_DEFAULT);
     mod.polyA1          = prefs.getFloat("polyA1",  TEMP_POLY_A1_DEFAULT);
     mod.polyA0          = prefs.getFloat("polyA0",  TEMP_POLY_A0_DEFAULT);
@@ -46,8 +46,8 @@ void StorageManager::saveModuleParams(uint8_t idx, ModuleData& mod) {
 
     prefs.putBool("active",  mod.active);
     prefs.putFloat("calib",  mod.calibFactor);
-    prefs.putFloat("tareM",  mod.tareMain_g);
-    prefs.putFloat("tareY",  mod.tareYield_g);
+    prefs.putFloat("tareMa", mod.tareMainAdc);
+    prefs.putFloat("tareYa", mod.tareYieldAdc);
     prefs.putFloat("polyA2", mod.polyA2);
     prefs.putFloat("polyA1", mod.polyA1);
     prefs.putFloat("polyA0", mod.polyA0);
@@ -134,8 +134,8 @@ bool StorageManager::exportToFile(const String& path) {
         o["id"]      = i;
         o["active"]  = tmp.active;
         o["calib"]   = tmp.calibFactor;
-        o["tareM"]   = tmp.tareMain_g;
-        o["tareY"]   = tmp.tareYield_g;
+        o["tareMa"]  = tmp.tareMainAdc;
+        o["tareYa"]  = tmp.tareYieldAdc;
         o["polyA2"]  = tmp.polyA2;
         o["polyA1"]  = tmp.polyA1;
         o["polyA0"]  = tmp.polyA0;
@@ -149,6 +149,8 @@ bool StorageManager::exportToFile(const String& path) {
     doc["network"]["ip"]       = net.staticIp;
     doc["network"]["gw"]       = net.gateway;
     doc["network"]["sn"]       = net.subnet;
+    doc["network"]["apSsid"]   = net.apSsid;
+    doc["network"]["apPass"]   = net.apPassword;
     doc["network"]["mqttSrv"]  = net.mqttServer;
     doc["network"]["mqttPort"] = net.mqttPort;
     doc["network"]["mqttUser"] = net.mqttUser;
@@ -183,8 +185,8 @@ bool StorageManager::importFromFile(const String& path) {
         loadModuleParams(idx, tmp);
         tmp.active         = o["active"]  | tmp.active;
         tmp.calibFactor    = o["calib"]   | tmp.calibFactor;
-        tmp.tareMain_g     = o["tareM"]   | tmp.tareMain_g;
-        tmp.tareYield_g    = o["tareY"]   | tmp.tareYield_g;
+        tmp.tareMainAdc    = o["tareMa"]  | tmp.tareMainAdc;
+        tmp.tareYieldAdc   = o["tareYa"]  | tmp.tareYieldAdc;
         tmp.polyA2         = o["polyA2"]  | tmp.polyA2;
         tmp.polyA1         = o["polyA1"]  | tmp.polyA1;
         tmp.polyA0         = o["polyA0"]  | tmp.polyA0;
@@ -197,16 +199,19 @@ bool StorageManager::importFromFile(const String& path) {
         NetworkConfig net;
         loadNetworkConfig(net);
         JsonVariant n = doc["network"];
-        net.useDhcp   = n["dhcp"]     | net.useDhcp;
-        net.staticIp  = n["ip"].as<String>();
-        net.gateway   = n["gw"].as<String>();
-        net.subnet    = n["sn"].as<String>();
-        net.mqttServer= n["mqttSrv"].as<String>();
-        net.mqttPort  = n["mqttPort"] | net.mqttPort;
-        net.mqttUser  = n["mqttUser"].as<String>();
-        net.mqttPrefix= n["mqttPfx"].as<String>();
-        net.haDiscovery= n["haDisc"] | net.haDiscovery;
-        net.mqttRetain = n["retain"] | net.mqttRetain;
+        // Nur vorhandene Schlüssel übernehmen – fehlende behalten den geladenen Wert
+        net.useDhcp    = n["dhcp"]      | net.useDhcp;
+        net.staticIp   = n["ip"]        | net.staticIp.c_str();
+        net.gateway    = n["gw"]        | net.gateway.c_str();
+        net.subnet     = n["sn"]        | net.subnet.c_str();
+        net.apSsid     = n["apSsid"]    | net.apSsid.c_str();
+        net.apPassword = n["apPass"]    | net.apPassword.c_str();
+        net.mqttServer = n["mqttSrv"]   | net.mqttServer.c_str();
+        net.mqttPort   = n["mqttPort"]  | net.mqttPort;
+        net.mqttUser   = n["mqttUser"]  | net.mqttUser.c_str();
+        net.mqttPrefix = n["mqttPfx"]   | net.mqttPrefix.c_str();
+        net.haDiscovery= n["haDisc"]    | net.haDiscovery;
+        net.mqttRetain = n["retain"]    | net.mqttRetain;
         saveNetworkConfig(net);
     }
     return true;

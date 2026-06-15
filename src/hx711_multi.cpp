@@ -29,6 +29,7 @@ void Hx711Multi::begin() {
         _modules[i].quickFilter.resize(HX711_QUICK_BUFFER_SIZE);
         _modules[i].outlierFilter.setThreshold(_modules[i].outlierThresh);
         _modules[i].online = false;
+        _lastReadyMs[i]    = 0;
     }
 
 #ifdef DEBUG_SERIAL
@@ -39,6 +40,9 @@ void Hx711Multi::begin() {
 // ── loop ───────────────────────────────────────────────────────────────────────
 
 void Hx711Multi::loop() {
+    // Im async-Kontext (Web/Import) angeforderte Parameteränderungen anwenden
+    _applyPendingParams();
+
     // Prüfen ob mindestens ein Modul bereit (DOUT LOW = Daten fertig)
     bool anyReady = false;
     for (uint8_t i = 0; i < HX711_MAX_MODULES; i++) {
@@ -66,6 +70,11 @@ void Hx711Multi::_readAllChannels() {
         ready[i] = (digitalRead(HX711_DOUT_PINS[i]) == LOW);
     }
 
+    // Bit-Burst gegen Interrupts schützen: ein WiFi/ETH-IRQ während eines
+    // SCK-HIGH-Pulses könnte diesen > 60 µs strecken → HX711 Power-Down.
+    static portMUX_TYPE hx711Mux = portMUX_INITIALIZER_UNLOCKED;
+    portENTER_CRITICAL(&hx711Mux);
+
     // 24 Datenbits atomar über gemeinsamen SCK lesen
     for (int bit = 23; bit >= 0; bit--) {
         // SCK HIGH über direktes Registerbit (kein digitalWriteFunc-Overhead)
@@ -91,20 +100,33 @@ void Hx711Multi::_readAllChannels() {
     delayMicroseconds(1);
     GPIO.out_w1tc = (1UL << HX711_SCK_PIN);
 
+    portEXIT_CRITICAL(&hx711Mux);
+
     // Rohdaten verarbeiten und in Filter einspeisen
     unsigned long now = millis();
     for (uint8_t i = 0; i < HX711_MAX_MODULES; i++) {
-        if (!ready[i]) { _modules[i].online = false; continue; }
+        if (!_modules[i].active) continue;
+
+        // Online-Status mit Timeout: ein einzelner verpasster Lesetakt
+        // (Modul mitten in der Wandlung) markiert das Modul nicht sofort offline.
+        if (!ready[i]) {
+            if (now - _lastReadyMs[i] > HX711_ONLINE_TIMEOUT_MS)
+                _modules[i].online = false;
+            continue;
+        }
         _modules[i].online = true;
+        _lastReadyMs[i]    = now;
 
         // 24-Bit Zweierkomplement → int32_t
         if (rawValues[i] & 0x800000) rawValues[i] |= 0xFF000000;
 
-        float raw_g = (float)rawValues[i] * _modules[i].calibFactor;
-        float net_g = raw_g - _modules[i].tareMain_g - _modules[i].tareYield_g;
-        float comp_g = _applyTempCompensation(i, net_g);
-
+        // Einheitenkonsistent: erst Tara in ADC-Counts, dann skalieren
         _modules[i].rawAdc = (float)rawValues[i];
+        float net_adc = (float)rawValues[i]
+                        - _modules[i].tareMainAdc
+                        - _modules[i].tareYieldAdc;
+        float net_g  = net_adc * _modules[i].calibFactor;
+        float comp_g = _applyTempCompensation(i, net_g);
 
         if (_modules[i].outlierFilter.isValid(comp_g, now)) {
             _modules[i].mainFilter.push(comp_g);
@@ -162,17 +184,46 @@ void Hx711Multi::startTareQuick(uint8_t m) {
 
 void Hx711Multi::clearTareYield(uint8_t m) {
     if (m >= HX711_MAX_MODULES) return;
-    _modules[m].tareYield_g = 0.0f;
+    _modules[m].tareYieldAdc = 0.0f;
     storage.saveModuleParams(m, _modules[m]);
 }
 
 void Hx711Multi::calibrate(uint8_t m, float knownWeight_g) {
     if (m >= HX711_MAX_MODULES || knownWeight_g == 0.0f) return;
-    float currentRaw = _modules[m].rawAdc;
-    float tare       = _modules[m].tareMain_g;
-    if ((currentRaw - tare) == 0.0f) return;
-    _modules[m].calibFactor = knownWeight_g / (currentRaw - tare);
-    storage.saveModuleParams(m, _modules[m]);
+    // Nicht-blockierend: Roh-ADC-Median sammeln, Faktor in _processTara berechnen
+    _calibKnownWeight[m]  = knownWeight_g;
+    _taraState[m]         = TaraState::COLLECTING_CALIB;
+    _taraSampleCount[m]   = 0;
+    _taraTargetSamples[m] = HX711_TARE_MAIN_SAMPLES;
+}
+
+void Hx711Multi::applyModuleParams(uint8_t m, const ModuleData& params) {
+    if (m >= HX711_MAX_MODULES) return;
+    // Async-sicher: Werte hinterlegen, Übernahme erfolgt in _applyPendingParams()
+    _pendingParams[m] = params;
+    _pendingApply[m]  = true;
+}
+
+void Hx711Multi::_applyPendingParams() {
+    for (uint8_t m = 0; m < HX711_MAX_MODULES; m++) {
+        if (!_pendingApply[m]) continue;
+        _pendingApply[m] = false;
+
+        // Nur Konfigurationsfelder übernehmen – Messwerte/Tara bleiben erhalten
+        _modules[m].active         = _pendingParams[m].active;
+        _modules[m].calibFactor    = _pendingParams[m].calibFactor;
+        _modules[m].polyA2         = _pendingParams[m].polyA2;
+        _modules[m].polyA1         = _pendingParams[m].polyA1;
+        _modules[m].polyA0         = _pendingParams[m].polyA0;
+        _modules[m].mainBufferSize = _pendingParams[m].mainBufferSize;
+        _modules[m].outlierThresh  = _pendingParams[m].outlierThresh;
+
+        // Live auf die laufenden Filter anwenden (im Mess-Task, keine Race-Condition)
+        _modules[m].mainFilter.resize(_modules[m].mainBufferSize);
+        _modules[m].outlierFilter.setThreshold(_modules[m].outlierThresh);
+
+        storage.saveModuleParams(m, _modules[m]);
+    }
 }
 
 void Hx711Multi::_processTara() {
@@ -180,38 +231,58 @@ void Hx711Multi::_processTara() {
         if (_taraState[m] == TaraState::IDLE) continue;
         if (!_modules[m].online) continue;
 
-        float raw_g = _modules[m].rawAdc * _modules[m].calibFactor;
+        // Tara/Kalibrierung arbeiten einheitenkonsistent in ADC-Counts
         if (_taraSampleCount[m] < _taraTargetSamples[m]) {
-            _taraSamples[m][_taraSampleCount[m]++] = raw_g;
+            _taraSamples[m][_taraSampleCount[m]++] = _modules[m].rawAdc;
         }
+        if (_taraSampleCount[m] < _taraTargetSamples[m]) continue;
 
-        if (_taraSampleCount[m] >= _taraTargetSamples[m]) {
-            // Median der gesammelten Samples
-            float sorted[50];
-            int n = _taraSampleCount[m];
-            memcpy(sorted, _taraSamples[m], n * sizeof(float));
-            std::sort(sorted, sorted + n);
-            float medianVal = sorted[n / 2];
+        // Median der gesammelten Roh-ADC-Samples
+        float sorted[HX711_TARA_BUFFER_SIZE];
+        int n = _taraSampleCount[m];
+        memcpy(sorted, _taraSamples[m], n * sizeof(float));
+        std::sort(sorted, sorted + n);
+        float medianAdc = sorted[n / 2];
 
-            if (_taraState[m] == TaraState::COLLECTING_MAIN) {
-                _modules[m].tareMain_g = medianVal;
+        switch (_taraState[m]) {
+            case TaraState::COLLECTING_MAIN:
+                _modules[m].tareMainAdc = medianAdc;
                 _modules[m].mainFilter.reset();
                 _modules[m].outlierFilter.reset();
                 storage.saveModuleParams(m, _modules[m]);
 #ifdef DEBUG_SERIAL
-                Serial.printf("[HX711] Grundtara Modul %d: %.1f g\n", m, medianVal);
+                Serial.printf("[HX711] Grundtara Modul %d: %.0f ADC\n", m, medianAdc);
 #endif
-            } else if (_taraState[m] == TaraState::COLLECTING_YIELD) {
-                _modules[m].tareYield_g = medianVal - _modules[m].tareMain_g;
+                break;
+
+            case TaraState::COLLECTING_YIELD:
+                _modules[m].tareYieldAdc = medianAdc - _modules[m].tareMainAdc;
                 storage.saveModuleParams(m, _modules[m]);
 #ifdef DEBUG_SERIAL
-                Serial.printf("[HX711] Ertragstara Modul %d: %.1f g\n", m, medianVal);
+                Serial.printf("[HX711] Ertragstara Modul %d: %.0f ADC\n", m, medianAdc);
 #endif
-            } else if (_taraState[m] == TaraState::COLLECTING_QUICK) {
-                _modules[m].tareMain_g = medianVal;
-                // Schnellmess-Tara nur im RAM (kein NVS-Speichern)
+                break;
+
+            case TaraState::COLLECTING_QUICK:
+                _modules[m].tareMainAdc = medianAdc; // nur RAM, kein NVS
+                break;
+
+            case TaraState::COLLECTING_CALIB: {
+                float netAdc = medianAdc - _modules[m].tareMainAdc;
+                if (netAdc != 0.0f) {
+                    _modules[m].calibFactor = _calibKnownWeight[m] / netAdc;
+                    storage.saveModuleParams(m, _modules[m]);
+#ifdef DEBUG_SERIAL
+                    Serial.printf("[HX711] Kalibrierung Modul %d: %.6f g/ADC\n",
+                                  m, _modules[m].calibFactor);
+#endif
+                }
+                break;
             }
-            _taraState[m] = TaraState::IDLE;
+
+            default:
+                break;
         }
+        _taraState[m] = TaraState::IDLE;
     }
 }

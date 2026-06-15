@@ -18,8 +18,8 @@ struct ModuleData {
     // Konfiguration (wird aus NVS geladen)
     bool    active          = false;
     float   calibFactor     = 1.0f;  // g pro ADC-Einheit
-    float   tareMain_g      = 0.0f;  // Grundtara
-    float   tareYield_g     = 0.0f;  // Ertragstara (persistent)
+    float   tareMainAdc     = 0.0f;  // Grundtara (ADC-Counts, einheitenkonsistent)
+    float   tareYieldAdc    = 0.0f;  // Ertragstara (ADC-Counts, persistent)
     float   polyA2          = TEMP_POLY_A2_DEFAULT;
     float   polyA1          = TEMP_POLY_A1_DEFAULT;
     float   polyA0          = TEMP_POLY_A0_DEFAULT;
@@ -43,8 +43,12 @@ public:
     void startTareQuick(uint8_t module);   // Schnellmess-Tara (10 Werte)
     void clearTareYield(uint8_t module);   // Ertragstara zurücksetzen
 
-    // Kalibrierung
+    // Kalibrierung (nicht-blockierend: sammelt Roh-Median, dann Faktor)
     void calibrate(uint8_t module, float knownWeight_g);
+
+    // Geänderte Parameter (Web/Import) übernehmen: async-sicher, wird im
+    // loop()-Kontext angewandt (Filter-resize läuft sonst parallel zur Messung)
+    void applyModuleParams(uint8_t module, const ModuleData& params);
 
     // Datenzugriff
     const ModuleData& getModule(uint8_t idx) const { return _modules[idx]; }
@@ -64,10 +68,19 @@ private:
 
     void _processTara();
 
-    // Tara-Sampler (non-blocking)
-    enum class TaraState { IDLE, COLLECTING_MAIN, COLLECTING_YIELD, COLLECTING_QUICK };
+    // Aus async-Kontext angeforderte Parameteränderungen im loop() übernehmen
+    void _applyPendingParams();
+    volatile bool _pendingApply[HX711_MAX_MODULES] = {};
+    ModuleData    _pendingParams[HX711_MAX_MODULES];
+
+    // Letzter Zeitpunkt mit gültigen Daten je Modul (für Online-Timeout)
+    unsigned long _lastReadyMs[HX711_MAX_MODULES] = {};
+
+    // Tara-/Kalibrier-Sampler (non-blocking)
+    enum class TaraState { IDLE, COLLECTING_MAIN, COLLECTING_YIELD, COLLECTING_QUICK, COLLECTING_CALIB };
     TaraState _taraState[HX711_MAX_MODULES] = {};
     int       _taraSampleCount[HX711_MAX_MODULES] = {};
-    float     _taraSamples[HX711_MAX_MODULES][50] = {};
+    float     _taraSamples[HX711_MAX_MODULES][HX711_TARA_BUFFER_SIZE] = {};
     int       _taraTargetSamples[HX711_MAX_MODULES] = {};
+    float     _calibKnownWeight[HX711_MAX_MODULES] = {};  // Sollgewicht für COLLECTING_CALIB
 };

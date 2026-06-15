@@ -22,6 +22,9 @@ void MqttManager::begin() {
 
     _client.setServer(_cfg.mqttServer.c_str(), _cfg.mqttPort);
     _client.setKeepAlive(MQTT_KEEPALIVE_S);
+    // Kurzer Socket-Timeout: blockiert den loop() bei nicht erreichbarem Broker
+    // nur kurz statt der Default-15 s (verhindert Messung-/Webserver-Stocken)
+    _client.setSocketTimeout(MQTT_SOCKET_TIMEOUT_S);
     // Verbindungsaufbau erfolgt in loop() sobald ETH verbunden ist
 }
 
@@ -120,7 +123,7 @@ void MqttManager::_publishHaDiscovery() {
         doc["retain"]            = _cfg.mqttRetain;
 
         JsonObject dev = doc["device"].to<JsonObject>();
-        dev["identifiers"][0]    = "bienenwaage3";
+        dev["identifiers"].add("bienenwaage3");
         dev["name"]              = "Bienenwaage3";
         dev["model"]             = "WT32-ETH01";
         dev["manufacturer"]      = "DIY";
@@ -142,7 +145,7 @@ void MqttManager::_publishHaDiscovery() {
         doc["value_template"]     = "{{ value }}";
 
         JsonObject dev = doc["device"].to<JsonObject>();
-        dev["identifiers"][0]     = "bienenwaage3";
+        dev["identifiers"].add("bienenwaage3");
         dev["name"]               = "Bienenwaage3";
 
         String cfgTopic = String(HA_DISCOVERY_PREFIX) + "/sensor/bw3_temperatur/config";

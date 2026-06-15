@@ -89,8 +89,12 @@ void ButtonHandler::_showModule() {
 }
 
 void ButtonHandler::_advanceModule() {
-    uint8_t count   = hx711.getModuleCount();
-    _selectedModule = (_selectedModule + 1) % count;
+    uint8_t count = hx711.getModuleCount();
+    // Nächstes AKTIVES Modul wählen; inaktive überspringen (Plan 4.9)
+    for (uint8_t step = 0; step < count; step++) {
+        _selectedModule = (_selectedModule + 1) % count;
+        if (hx711.getModule(_selectedModule).active) break;
+    }
     _showModule();
 }
 
